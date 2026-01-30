@@ -5,13 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Security Alerts</title>
 
-  <!-- Makes it behave more like an iPhone app when added to Home Screen -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Alerts">
 
   <style>
-    /* ---------- Light theme (default) ---------- */
     :root{
       --bg: #f3f4f6;
       --surface: #ffffff;
@@ -25,9 +23,9 @@
       --btn-text: #111827;
       --error: #b91c1c;
       --ok: #065f46;
+      --warn: #92400e;
     }
 
-    /* ---------- Dark theme overrides ---------- */
     body.dark {
       --bg: #0b1220;
       --surface: #0f172a;
@@ -41,6 +39,7 @@
       --btn-text: #e5e7eb;
       --error: #fca5a5;
       --ok: #86efac;
+      --warn: #fbbf24;
     }
 
     body {
@@ -55,6 +54,7 @@
       background: var(--surface);
       padding: 14px 16px;
       border-bottom: 1px solid var(--border);
+      z-index: 5;
     }
     h1 { margin: 0; font-size: 18px; }
     .sub {
@@ -65,6 +65,7 @@
       justify-content: space-between;
       gap: 10px;
       flex-wrap: wrap;
+      align-items: center;
     }
     .pill {
       padding: 4px 10px;
@@ -73,15 +74,23 @@
       color: var(--pill-text);
       font-size: 12px;
       border: 1px solid var(--border);
+      white-space: nowrap;
     }
-    main { padding: 12px 12px 24px; }
+
+    main { padding: 12px 12px 24px; max-width: 980px; margin: 0 auto; }
+
+    .grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    @media (min-width: 860px){
+      .grid { grid-template-columns: 360px 1fr; align-items: start; }
+    }
+
     .card {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 12px;
-      margin: 10px 0;
     }
+
     .msg { font-size: 15px; margin: 0 0 8px; }
     .meta {
       font-size: 12px;
@@ -89,7 +98,9 @@
       display: flex;
       justify-content: space-between;
       gap: 10px;
+      flex-wrap: wrap;
     }
+
     .btnrow { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
     button {
       border: 1px solid var(--btn-border);
@@ -98,194 +109,510 @@
       padding: 10px 12px;
       border-radius: 10px;
       font-size: 14px;
+      cursor: pointer;
     }
     button:active { transform: scale(0.99); }
+    button.primary { background: var(--pill-bg); border-color: var(--border); }
+    button.danger { border-color: #ef4444; }
+    button:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    input, select {
+      width: 100%;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 14px;
+      box-sizing: border-box;
+      outline: none;
+    }
+    label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 6px; }
+
     .error { color: var(--error); }
     .ok { color: var(--ok); }
+    .warn { color: var(--warn); }
     .muted { color: var(--muted); }
     .empty { text-align: center; padding: 28px 12px; color: var(--muted); }
+
+    .divider { height: 1px; background: var(--border); margin: 12px 0; }
+
+    .small { font-size: 12px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
   </style>
 </head>
+
 <body>
   <header>
     <h1>Security Alerts</h1>
     <div class="sub">
       <div id="status" class="pill muted">Loading…</div>
       <div class="pill">Auto refresh: <span id="intervalLabel">2</span>s</div>
+      <div class="pill">User: <span id="userLabel" class="mono">—</span></div>
     </div>
 
     <div class="btnrow">
       <button id="refreshBtn">Refresh now</button>
       <button id="clearLocalBtn" title="Hides alerts locally (does not delete Firebase)">Clear on screen</button>
       <button id="themeBtn" title="Toggle night mode">Night mode: Off</button>
+      <button id="logoutBtn" class="danger" style="margin-left:auto; display:none;">Log out</button>
     </div>
   </header>
 
   <main>
-    <div id="list"></div>
-    <div id="empty" class="empty" style="display:none;">
-      No alerts yet.<br><br>
-      Trigger your system or wait for the next alert.
+    <div class="grid">
+      <!-- LEFT: Auth + Pairing -->
+      <div class="card">
+        <h3 style="margin:0 0 8px;">Account</h3>
+
+        <div id="authPanel">
+          <label>Email</label>
+          <input id="email" type="email" placeholder="name@example.com" autocomplete="email"/>
+
+          <label>Password</label>
+          <input id="password" type="password" placeholder="••••••••" autocomplete="current-password"/>
+
+          <div class="btnrow">
+            <button id="loginBtn" class="primary">Log in</button>
+            <button id="signupBtn">Create account</button>
+          </div>
+
+          <div class="divider"></div>
+
+          <label>Forgot password?</label>
+          <input id="resetEmail" type="email" placeholder="Email to send reset link" autocomplete="email"/>
+          <div class="btnrow">
+            <button id="resetBtn">Send reset email</button>
+          </div>
+
+          <p class="small muted" style="margin:10px 0 0;">
+            Password reset uses Firebase Auth email reset (free). Check spam/junk folders.
+          </p>
+        </div>
+
+        <div id="pairPanel" style="display:none;">
+          <h3 style="margin:0 0 8px;">Pair a device</h3>
+          <p class="small muted" style="margin:0 0 8px;">
+            Enter the Device ID + Pairing Code shown on the ESP8266 AP page.
+          </p>
+
+          <label>Device ID</label>
+          <input id="deviceId" placeholder="Example: SystemA" />
+
+          <label>Pairing Code</label>
+          <input id="pairCode" placeholder="Example: 839201" />
+
+          <div class="btnrow">
+            <button id="pairBtn" class="primary">Pair device</button>
+          </div>
+
+          <div class="divider"></div>
+
+          <label>Your paired devices</label>
+          <select id="deviceSelect"></select>
+
+          <div class="btnrow">
+            <button id="reloadDevicesBtn">Reload devices</button>
+          </div>
+
+          <p class="small muted" style="margin:10px 0 0;">
+            Pairing is saved to your account in Firebase, so you can log out/in and keep access.
+          </p>
+        </div>
+
+        <div class="divider"></div>
+        <p id="authMsg" class="small muted" style="margin:0;"></p>
+      </div>
+
+      <!-- RIGHT: Alerts -->
+      <div>
+        <div id="list"></div>
+        <div id="empty" class="empty" style="display:none;">
+          No alerts yet.<br><br>
+          Trigger your system or wait for the next alert.
+        </div>
+      </div>
     </div>
   </main>
 
-<script>
-  // ========= CONFIG =========
-  const DB_BASE = "https://all-in-one-security-system-default-rtdb.firebaseio.com";
-  const ALERTS_URL = `${DB_BASE}/alerts.json`;
-  let REFRESH_SECONDS = 2; // auto refresh interval
-  const MAX_ITEMS = 50;    // show newest 50
-  // ==========================
+  <script type="module">
+    // ------------------------------------------------------------
+    // Firebase SDK (v10 modular) via CDN modules
+    // ------------------------------------------------------------
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import {
+      getAuth,
+      onAuthStateChanged,
+      signInWithEmailAndPassword,
+      createUserWithEmailAndPassword,
+      signOut,
+      sendPasswordResetEmail
+    } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-  const statusEl = document.getElementById("status");
-  const listEl = document.getElementById("list");
-  const emptyEl = document.getElementById("empty");
-  const intervalLabelEl = document.getElementById("intervalLabel");
-  intervalLabelEl.textContent = REFRESH_SECONDS;
+    import {
+      getDatabase,
+      ref,
+      get,
+      set,
+      query,
+      orderByChild,
+      limitToLast
+    } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-  // Keep track of items hidden locally (so "Clear on screen" works without deleting Firebase)
-  const HIDDEN_KEY = "hiddenAlertKeys";
-  const hiddenKeys = new Set(JSON.parse(localStorage.getItem(HIDDEN_KEY) || "[]"));
+    // ========= YOUR FIREBASE WEB CONFIG =========
+    // Firebase Console -> Project settings -> General -> "Your apps" -> Web app -> config
+    const firebaseConfig = {
+      apiKey: "AIzaSyBk7o8KHY3qH3kCy-566j4_UKna8qkF0fM",
+      authDomain: "all-in-one-security-system.firebaseapp.com",
+      databaseURL: "https://all-in-one-security-system-default-rtdb.firebaseio.com",
+      projectId: "all-in-one-security-system",
+      storageBucket: "all-in-one-security-system.firebasestorage.app",
+      messagingSenderId: "503460021077",
+      appId: "1:503460021077:web:ffbaa186aeb34a749ce5dc"
+    };
+    // ===========================================
 
-  function saveHidden() {
-    localStorage.setItem(HIDDEN_KEY, JSON.stringify(Array.from(hiddenKeys)));
-  }
+    // ========= UI CONFIG =========
+    let REFRESH_SECONDS = 2;
+    const MAX_ITEMS = 50;
+    // =============================
 
-  function setStatus(text, kind) {
-    statusEl.textContent = text;
-    statusEl.classList.remove("error", "ok", "muted");
-    if (kind) statusEl.classList.add(kind);
-    else statusEl.classList.add("muted");
-  }
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getDatabase(app);
 
-  function formatTs(ts) {
-    const n = Number(ts);
-    if (!isFinite(n) || n <= 0) return "time unknown";
-    const ms = (n > 1577836800) ? (n * 1000) : n; // epoch seconds -> ms
-    const d = new Date(ms);
-    if (isNaN(d.getTime())) return String(ts);
-    return d.toLocaleString();
-  }
+    const statusEl = document.getElementById("status");
+    const listEl = document.getElementById("list");
+    const emptyEl = document.getElementById("empty");
+    const intervalLabelEl = document.getElementById("intervalLabel");
+    const userLabelEl = document.getElementById("userLabel");
+    const logoutBtn = document.getElementById("logoutBtn");
 
-  function renderItems(items) {
-    listEl.innerHTML = "";
-    const visible = items.filter(x => !hiddenKeys.has(x.key));
+    const authPanel = document.getElementById("authPanel");
+    const pairPanel = document.getElementById("pairPanel");
+    const authMsg = document.getElementById("authMsg");
 
-    if (visible.length === 0) {
-      emptyEl.style.display = "block";
-      return;
+    const deviceSelect = document.getElementById("deviceSelect");
+
+    intervalLabelEl.textContent = REFRESH_SECONDS;
+
+    // ---------- Local hide (per device) ----------
+    function hiddenKeyForDevice(deviceId){ return `hiddenAlertKeys:${deviceId}`; }
+    function loadHiddenSet(deviceId){
+      return new Set(JSON.parse(localStorage.getItem(hiddenKeyForDevice(deviceId)) || "[]"));
     }
-    emptyEl.style.display = "none";
-
-    for (const item of visible) {
-      const card = document.createElement("div");
-      card.className = "card";
-
-      const msg = document.createElement("p");
-      msg.className = "msg";
-      msg.textContent = item.msg || "(no message)";
-
-      const meta = document.createElement("div");
-      meta.className = "meta";
-      meta.innerHTML = `
-        <span class="muted">${formatTs(item.ts)}</span>
-        <span class="muted">id: ${item.key}</span>
-      `;
-
-      const btnRow = document.createElement("div");
-      btnRow.className = "btnrow";
-
-      const hideBtn = document.createElement("button");
-      hideBtn.textContent = "Hide";
-      hideBtn.onclick = () => {
-        hiddenKeys.add(item.key);
-        saveHidden();
-        loadAlerts();
-      };
-
-      btnRow.appendChild(hideBtn);
-      card.appendChild(msg);
-      card.appendChild(meta);
-      card.appendChild(btnRow);
-      listEl.appendChild(card);
+    function saveHiddenSet(deviceId, setObj){
+      localStorage.setItem(hiddenKeyForDevice(deviceId), JSON.stringify(Array.from(setObj)));
     }
-  }
 
-  async function loadAlerts() {
-    try {
-      setStatus("Refreshing…", "muted");
-      const res = await fetch(ALERTS_URL, { cache: "no-store" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
+    function setStatus(text, kind) {
+      statusEl.textContent = text;
+      statusEl.classList.remove("error", "ok", "muted", "warn");
+      statusEl.classList.add(kind || "muted");
+    }
 
-      if (!data) {
-        renderItems([]);
-        setStatus("Connected (no alerts)", "ok");
+    function setAuthMsg(text, kind){
+      authMsg.textContent = text || "";
+      authMsg.classList.remove("error","ok","muted","warn");
+      authMsg.classList.add(kind || "muted");
+    }
+
+    function formatTs(ts) {
+      const n = Number(ts);
+      if (!isFinite(n) || n <= 0) return "time unknown";
+      const ms = (n > 1577836800) ? (n * 1000) : n; // epoch seconds -> ms
+      const d = new Date(ms);
+      if (isNaN(d.getTime())) return String(ts);
+      return d.toLocaleString();
+    }
+
+    function renderItems(deviceId, items) {
+      listEl.innerHTML = "";
+      const hiddenKeys = loadHiddenSet(deviceId);
+      const visible = items.filter(x => !hiddenKeys.has(x.key));
+
+      if (visible.length === 0) {
+        emptyEl.style.display = "block";
+        return;
+      }
+      emptyEl.style.display = "none";
+
+      for (const item of visible) {
+        const card = document.createElement("div");
+        card.className = "card";
+
+        const msg = document.createElement("p");
+        msg.className = "msg";
+        msg.textContent = item.msg || "(no message)";
+
+        const meta = document.createElement("div");
+        meta.className = "meta";
+        meta.innerHTML = `
+          <span class="muted">${formatTs(item.ts)}</span>
+          <span class="muted">id: <span class="mono">${item.key}</span></span>
+        `;
+
+        const btnRow = document.createElement("div");
+        btnRow.className = "btnrow";
+
+        const hideBtn = document.createElement("button");
+        hideBtn.textContent = "Hide";
+        hideBtn.onclick = () => {
+          hiddenKeys.add(item.key);
+          saveHiddenSet(deviceId, hiddenKeys);
+          loadAlertsForSelectedDevice();
+        };
+
+        btnRow.appendChild(hideBtn);
+
+        card.appendChild(msg);
+        card.appendChild(meta);
+        card.appendChild(btnRow);
+
+        listEl.appendChild(card);
+      }
+    }
+
+    async function loadDevicesForUser(uid){
+      deviceSelect.innerHTML = "";
+      const snap = await get(ref(db, `users/${uid}/devices`));
+      const val = snap.exists() ? snap.val() : null;
+
+      const ids = val ? Object.keys(val) : [];
+      if (ids.length === 0){
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "No devices paired yet";
+        deviceSelect.appendChild(opt);
+        deviceSelect.disabled = true;
         return;
       }
 
-      const items = Object.entries(data).map(([key, val]) => ({
-        key,
-        msg: val?.msg ?? "",
-        ts: val?.ts ?? 0
-      }));
-
-      items.sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0));
-      renderItems(items.slice(0, MAX_ITEMS));
-      setStatus(`Connected • ${items.length} total`, "ok");
-    } catch (e) {
-      console.error(e);
-      setStatus("Error loading alerts", "error");
+      deviceSelect.disabled = false;
+      for (const id of ids.sort()){
+        const opt = document.createElement("option");
+        opt.value = id;
+        opt.textContent = id;
+        deviceSelect.appendChild(opt);
+      }
     }
-  }
 
-  document.getElementById("refreshBtn").onclick = loadAlerts;
+    async function loadAlertsForSelectedDevice() {
+      const user = auth.currentUser;
+      if (!user) {
+        renderItems("none", []);
+        setStatus("Please log in", "warn");
+        return;
+      }
 
-  document.getElementById("clearLocalBtn").onclick = () => {
-    (async () => {
+      const deviceId = deviceSelect.value;
+      if (!deviceId) {
+        renderItems("none", []);
+        setStatus("No device selected", "warn");
+        return;
+      }
+
       try {
-        const res = await fetch(ALERTS_URL, { cache: "no-store" });
-        const data = await res.json();
-        if (data) {
-          Object.keys(data).forEach(k => hiddenKeys.add(k));
-          saveHidden();
+        setStatus(`Loading alerts for ${deviceId}…`, "muted");
+
+        const q = query(
+          ref(db, `alerts/${deviceId}`),
+          orderByChild("ts"),
+          limitToLast(MAX_ITEMS)
+        );
+
+        const snap = await get(q);
+        if (!snap.exists()) {
+          renderItems(deviceId, []);
+          setStatus(`Connected • ${deviceId} (no alerts)`, "ok");
+          return;
         }
-        loadAlerts();
-      } catch {}
-    })();
-  };
 
-  // ---------- Theme (Night Mode) ----------
-  const THEME_KEY = "alertsTheme"; // "dark" | "light"
-  const themeBtn = document.getElementById("themeBtn");
+        const data = snap.val();
+        const items = Object.entries(data).map(([key, val]) => ({
+          key,
+          msg: val?.msg ?? "",
+          ts: val?.ts ?? 0
+        }));
 
-  function applyTheme(mode) {
-    const isDark = (mode === "dark");
-    document.body.classList.toggle("dark", isDark);
-    themeBtn.textContent = `Night mode: ${isDark ? "On" : "Off"}`;
-    localStorage.setItem(THEME_KEY, mode);
-  }
-
-  // First run: use saved theme, else system preference
-  (function initTheme(){
-    const saved = localStorage.getItem(THEME_KEY);
-    if (saved === "dark" || saved === "light") {
-      applyTheme(saved);
-      return;
+        items.sort((a,b) => Number(b.ts||0) - Number(a.ts||0));
+        renderItems(deviceId, items);
+        setStatus(`Connected • ${deviceId} • ${items.length} shown`, "ok");
+      } catch (e){
+        console.error(e);
+        setStatus("Error loading alerts", "error");
+      }
     }
-    const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-    applyTheme(prefersDark ? "dark" : "light");
-  })();
 
-  themeBtn.onclick = () => {
-    const currentlyDark = document.body.classList.contains("dark");
-    applyTheme(currentlyDark ? "light" : "dark");
-  };
-  // --------------------------------------
+    // --------------------------
+    // Auth actions
+    // --------------------------
+    document.getElementById("loginBtn").onclick = async () => {
+      try {
+        setAuthMsg("Logging in…", "muted");
+        const email = document.getElementById("email").value.trim();
+        const pass  = document.getElementById("password").value;
+        await signInWithEmailAndPassword(auth, email, pass);
+        setAuthMsg("Logged in.", "ok");
+      } catch (e){
+        console.error(e);
+        setAuthMsg(e.message || "Login failed", "error");
+      }
+    };
 
-  // Initial load + auto refresh
-  loadAlerts();
-  setInterval(loadAlerts, REFRESH_SECONDS * 1000);
-</script>
+    document.getElementById("signupBtn").onclick = async () => {
+      try {
+        setAuthMsg("Creating account…", "muted");
+        const email = document.getElementById("email").value.trim();
+        const pass  = document.getElementById("password").value;
+        await createUserWithEmailAndPassword(auth, email, pass);
+        setAuthMsg("Account created & logged in.", "ok");
+      } catch (e){
+        console.error(e);
+        setAuthMsg(e.message || "Signup failed", "error");
+      }
+    };
+
+    document.getElementById("resetBtn").onclick = async () => {
+      try {
+        const email = document.getElementById("resetEmail").value.trim();
+        if (!email) {
+          setAuthMsg("Enter your email to reset the password.", "warn");
+          return;
+        }
+        setAuthMsg("Sending reset email…", "muted");
+        await sendPasswordResetEmail(auth, email);
+        setAuthMsg("Reset email sent. Check your inbox/spam.", "ok");
+      } catch (e){
+        console.error(e);
+        setAuthMsg(e.message || "Reset failed", "error");
+      }
+    };
+
+    logoutBtn.onclick = async () => {
+      await signOut(auth);
+    };
+
+    // --------------------------
+    // Pair device
+    // --------------------------
+    document.getElementById("pairBtn").onclick = async () => {
+      const user = auth.currentUser;
+      if (!user) return;
+
+      const deviceId = document.getElementById("deviceId").value.trim();
+      const pairCode = document.getElementById("pairCode").value.trim();
+
+      if (!deviceId || !pairCode){
+        setAuthMsg("Enter Device ID and Pairing Code.", "warn");
+        return;
+      }
+
+      try {
+        setAuthMsg("Pairing device…", "muted");
+
+        // This write is allowed ONLY if pairCode matches /devices/{deviceId}/pairCode
+        await set(ref(db, `users/${user.uid}/devices/${deviceId}`), {
+          pairedAt: Date.now(),
+          code: pairCode
+        });
+
+        setAuthMsg(`Paired ${deviceId}.`, "ok");
+        await loadDevicesForUser(user.uid);
+        deviceSelect.value = deviceId;
+        await loadAlertsForSelectedDevice();
+      } catch (e){
+        console.error(e);
+        setAuthMsg(
+          "Pairing failed. Check Device ID and Pairing Code (or device not registered yet).",
+          "error"
+        );
+      }
+    };
+
+    document.getElementById("reloadDevicesBtn").onclick = async () => {
+      const user = auth.currentUser;
+      if (!user) return;
+      await loadDevicesForUser(user.uid);
+      await loadAlertsForSelectedDevice();
+    };
+
+    deviceSelect.onchange = loadAlertsForSelectedDevice;
+
+    // --------------------------
+    // Buttons for alerts UI
+    // --------------------------
+    document.getElementById("refreshBtn").onclick = loadAlertsForSelectedDevice;
+
+    document.getElementById("clearLocalBtn").onclick = () => {
+      const user = auth.currentUser;
+      const deviceId = deviceSelect.value;
+      if (!user || !deviceId) return;
+
+      // Hide currently loaded cards locally
+      const keys = [];
+      listEl.querySelectorAll(".card .meta .mono").forEach(el => keys.push(el.textContent.trim()));
+      const hidden = loadHiddenSet(deviceId);
+      keys.forEach(k => hidden.add(k));
+      saveHiddenSet(deviceId, hidden);
+      loadAlertsForSelectedDevice();
+    };
+
+    // ---------- Theme (Night Mode) ----------
+    const THEME_KEY = "alertsTheme";
+    const themeBtn = document.getElementById("themeBtn");
+
+    function applyTheme(mode) {
+      const isDark = (mode === "dark");
+      document.body.classList.toggle("dark", isDark);
+      themeBtn.textContent = `Night mode: ${isDark ? "On" : "Off"}`;
+      localStorage.setItem(THEME_KEY, mode);
+    }
+
+    (function initTheme(){
+      const saved = localStorage.getItem(THEME_KEY);
+      if (saved === "dark" || saved === "light") {
+        applyTheme(saved);
+        return;
+      }
+      const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+      applyTheme(prefersDark ? "dark" : "light");
+    })();
+
+    themeBtn.onclick = () => {
+      const currentlyDark = document.body.classList.contains("dark");
+      applyTheme(currentlyDark ? "light" : "dark");
+    };
+    // --------------------------------------
+
+    // --------------------------
+    // Auth state handler
+    // --------------------------
+    onAuthStateChanged(auth, async (user) => {
+      if (!user){
+        userLabelEl.textContent = "—";
+        logoutBtn.style.display = "none";
+        authPanel.style.display = "block";
+        pairPanel.style.display = "none";
+        deviceSelect.innerHTML = "";
+        setStatus("Please log in", "warn");
+        setAuthMsg("Log in to view alerts.", "muted");
+        renderItems("none", []);
+        return;
+      }
+
+      userLabelEl.textContent = user.email || user.uid;
+      logoutBtn.style.display = "inline-block";
+      authPanel.style.display = "none";
+      pairPanel.style.display = "block";
+      setAuthMsg("Logged in. Pair a device or select one.", "ok");
+
+      await loadDevicesForUser(user.uid);
+      await loadAlertsForSelectedDevice();
+    });
+
+    // Auto refresh
+    setInterval(loadAlertsForSelectedDevice, REFRESH_SECONDS * 1000);
+  </script>
 </body>
 </html>

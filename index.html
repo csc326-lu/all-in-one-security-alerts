@@ -733,9 +733,10 @@
       try {
         setAuthMsg("Pairing device…", "muted");
 
+        // IMPORTANT: rules require fields: pc + pairedAt
         await set(ref(db, `users/${user.uid}/devices/${deviceId}`), {
           pairedAt: Date.now(),
-          code: pairCode
+          pc: pairCode
         });
 
         setAuthMsg(`Paired ${deviceId}.`, "ok");

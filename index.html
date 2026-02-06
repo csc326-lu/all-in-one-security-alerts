@@ -25,7 +25,7 @@
       --ok: #065f46;
       --warn: #92400e;
 
-      /* NEW: alert type colors (light mode) */
+      /* alert type colors (light mode) */
       --alert-info: #2563eb;       /* blue */
       --alert-online: #16a34a;     /* green */
       --alert-vibration: #9333ea;  /* purple */
@@ -49,7 +49,7 @@
       --ok: #86efac;
       --warn: #fbbf24;
 
-      /* NEW: alert type colors (dark mode) */
+      /* alert type colors (dark mode) */
       --alert-info: #60a5fa;
       --alert-online: #4ade80;
       --alert-vibration: #c084fc;
@@ -167,7 +167,7 @@
     }
 
     /* =========================================================
-       NEW: Distinct alert styling
+       Distinct alert styling
        ========================================================= */
     .alertCard{
       position: relative;
@@ -213,6 +213,19 @@
 
     .alert--gas{ border-left-color: var(--alert-gas); background: linear-gradient(90deg, rgba(220,38,38,0.10), rgba(0,0,0,0) 45%); }
     body.dark .alert--gas{ background: linear-gradient(90deg, rgba(248,113,113,0.10), rgba(0,0,0,0) 45%); }
+
+    /* =========================================================
+       NEW: clickable alerts + filter bar
+       ========================================================= */
+    .alertClickable{
+      cursor: pointer;
+    }
+    .alertClickable:hover{
+      filter: brightness(0.99);
+    }
+    body.dark .alertClickable:hover{
+      filter: brightness(1.05);
+    }
   </style>
 </head>
 
@@ -320,7 +333,7 @@
             Pairing is saved to your account in Firebase, so you can log out/in and keep access.
           </p>
 
-          <!-- NEW: Manage/Delete paired devices -->
+          <!-- Manage/Delete paired devices -->
           <div class="divider"></div>
 
           <h3 style="margin:0 0 8px;">Manage paired devices</h3>
@@ -334,7 +347,6 @@
           <div class="btnrow">
             <button id="deleteDeviceBtn" class="danger">Delete device</button>
           </div>
-          <!-- END NEW -->
         </div>
 
         <div class="divider"></div>
@@ -343,6 +355,17 @@
 
       <!-- RIGHT: Alerts -->
       <div>
+        <!-- NEW: Filter bar (shows when you click an alert) -->
+        <div id="filterBar" class="card" style="display:none; margin-bottom:12px;">
+          <div class="alertTop" style="margin-bottom:0;">
+            <span id="filterBadge" class="alertBadge"><span class="emoji">🔎</span> Sensor</span>
+            <button id="clearFilterBtn" class="primary">Show all alerts</button>
+          </div>
+          <p class="small muted" style="margin:10px 0 0;">
+            Showing alerts for the selected sensor type over time (newest first).
+          </p>
+        </div>
+
         <div id="list"></div>
         <div id="empty" class="empty" style="display:none;">
           No alerts yet.<br><br>
@@ -412,6 +435,16 @@
     const deleteDeviceSelect = document.getElementById("deleteDeviceSelect");
     const deleteDeviceBtn = document.getElementById("deleteDeviceBtn");
 
+    // NEW: filter UI refs
+    const filterBar = document.getElementById("filterBar");
+    const filterBadge = document.getElementById("filterBadge");
+    const clearFilterBtn = document.getElementById("clearFilterBtn");
+
+    // NEW: keep last loaded alerts so we can re-render filtered view without refetching
+    let lastLoaded = { deviceId: "", items: [] };
+    // NEW: current sensor filter (klass.type) or null for all
+    let currentSensorFilter = null;
+
     intervalLabelEl.textContent = REFRESH_SECONDS;
 
     function setStatus(text, kind) {
@@ -457,7 +490,7 @@
     }
 
     /* =========================================================
-       NEW: alert classification (message -> type + label + emoji)
+       alert classification (message -> type + label + emoji)
        ========================================================= */
     function classifyAlert(msgRaw){
       const msg = String(msgRaw || "").toLowerCase();
@@ -491,10 +524,36 @@
       return { type: "info", label: "Alert", emoji: "🔔" };
     }
 
+    // NEW: filter bar helpers
+    function applySensorFilter(type, label, emoji){
+      currentSensorFilter = type || null;
+
+      if (!currentSensorFilter){
+        filterBar.style.display = "none";
+      } else {
+        filterBar.style.display = "block";
+        filterBadge.innerHTML = `<span class="emoji">${emoji || "🔎"}</span> ${label || type}`;
+      }
+
+      // re-render using last loaded items (no refetch)
+      const deviceId = lastLoaded.deviceId || deviceSelect.value || "none";
+      renderItems(deviceId, lastLoaded.items || []);
+    }
+
+    clearFilterBtn.onclick = () => applySensorFilter(null);
+
     function renderItems(deviceId, items) {
       listEl.innerHTML = "";
       const hiddenKeys = loadHiddenSet(deviceId);
-      const visible = items.filter(x => !hiddenKeys.has(x.key));
+
+      // Apply sensor filter (if set) + hidden filter
+      const visible = items
+        .filter(x => !hiddenKeys.has(x.key))
+        .filter(x => {
+          if (!currentSensorFilter) return true;
+          const k = classifyAlert(x.msg);
+          return k.type === currentSensorFilter;
+        });
 
       if (visible.length === 0) {
         emptyEl.style.display = "block";
@@ -506,9 +565,15 @@
         const klass = classifyAlert(item.msg);
 
         const card = document.createElement("div");
-        card.className = `card alertCard alert--${klass.type}`;
+        card.className = `card alertCard alert--${klass.type} alertClickable`;
 
-        // NEW: top row with badge + time
+        // NEW: clicking the card filters to that sensor type
+        card.onclick = (ev) => {
+          // If user clicked the Hide button (or inside it), do not filter
+          if (ev.target && ev.target.closest && ev.target.closest("button")) return;
+          applySensorFilter(klass.type, klass.label, klass.emoji);
+        };
+
         const top = document.createElement("div");
         top.className = "alertTop";
 
@@ -539,7 +604,8 @@
 
         const hideBtn = document.createElement("button");
         hideBtn.textContent = "Hide";
-        hideBtn.onclick = () => {
+        hideBtn.onclick = (ev) => {
+          ev.stopPropagation(); // prevent card click filter
           hiddenKeys.add(item.key);
           saveHiddenSet(deviceId, hiddenKeys);
           loadAlertsForSelectedDevice();
@@ -583,7 +649,6 @@
       const ids = val ? Object.keys(val) : [];
 
       fillSelect(deviceSelect, ids, "No devices paired yet");
-
       fillSelect(deleteDeviceSelect, ids, "No devices to delete");
       deleteDeviceBtn.disabled = !(ids && ids.length);
 
@@ -595,6 +660,7 @@
     async function loadAlertsForSelectedDevice() {
       const user = auth.currentUser;
       if (!user) {
+        lastLoaded = { deviceId: "", items: [] };
         renderItems("none", []);
         setStatus("Please log in", "warn");
         return;
@@ -602,6 +668,7 @@
 
       const deviceId = deviceSelect.value;
       if (!deviceId) {
+        lastLoaded = { deviceId: "", items: [] };
         renderItems("none", []);
         setStatus("No device selected", "warn");
         return;
@@ -618,6 +685,7 @@
 
         const snap = await get(q);
         if (!snap.exists()) {
+          lastLoaded = { deviceId, items: [] };
           renderItems(deviceId, []);
           setStatus(`Connected • ${deviceId} (no alerts)`, "ok");
           return;
@@ -631,6 +699,10 @@
         }));
 
         items.sort((a,b) => Number(b.ts||0) - Number(a.ts||0));
+
+        // NEW: store for filtering view
+        lastLoaded = { deviceId, items };
+
         renderItems(deviceId, items);
         setStatus(`Connected • ${deviceId} • ${items.length} shown`, "ok");
       } catch (e){
@@ -745,6 +817,7 @@
 
         if (!deleteDeviceSelect.disabled) deleteDeviceSelect.value = deviceId;
 
+        // Keep current filter, but refresh list
         await loadAlertsForSelectedDevice();
       } catch (e){
         console.error(e);
@@ -762,7 +835,11 @@
       await loadAlertsForSelectedDevice();
     };
 
-    deviceSelect.onchange = loadAlertsForSelectedDevice;
+    deviceSelect.onchange = async () => {
+      // When switching devices, clear sensor filter so it doesn't look “empty”
+      applySensorFilter(null);
+      await loadAlertsForSelectedDevice();
+    };
 
     // --------------------------
     // Delete paired device
@@ -795,6 +872,7 @@
           deleteDeviceSelect.value = deviceSelect.value || deleteDeviceSelect.options[0]?.value || "";
         }
 
+        // If current filter is set, keep it; but if device changed, list updates
         await loadAlertsForSelectedDevice();
         setAuthMsg(`Deleted ${idToDelete}.`, "ok");
       } catch (e){
@@ -861,6 +939,10 @@
         deviceSelect.innerHTML = "";
         deleteDeviceSelect.innerHTML = "";
         deleteDeviceBtn.disabled = true;
+
+        // NEW: clear sensor filter UI/state on logout
+        applySensorFilter(null);
+        lastLoaded = { deviceId: "", items: [] };
 
         setStatus("Please log in", "warn");
         setAuthMsg("Log in to view alerts.", "muted");

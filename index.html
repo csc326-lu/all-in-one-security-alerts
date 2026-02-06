@@ -1,4 +1,4 @@
-<!doctype html>
+<!doctype html> 
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -93,11 +93,11 @@
       white-space: nowrap;
     }
 
-    main { padding: 12px 12px 24px; max-width: 980px; margin: 0 auto; }
+    main { padding: 12px 12px 24px; max-width: 1200px; margin: 0 auto; }
 
     .grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
-    @media (min-width: 860px){
-      .grid { grid-template-columns: 360px 1fr; align-items: start; }
+    @media (min-width: 1040px){
+      .grid { grid-template-columns: 360px 1fr 380px; align-items: start; }
     }
 
     .card {
@@ -215,7 +215,7 @@
     body.dark .alert--gas{ background: linear-gradient(90deg, rgba(248,113,113,0.10), rgba(0,0,0,0) 45%); }
 
     /* =========================================================
-       NEW: clickable alerts + filter bar
+       Clickable alerts
        ========================================================= */
     .alertClickable{
       cursor: pointer;
@@ -225,6 +225,51 @@
     }
     body.dark .alertClickable:hover{
       filter: brightness(1.05);
+    }
+
+    /* =========================================================
+       NEW: Chart panel
+       ========================================================= */
+    #chartCol { display:none; }
+    @media (min-width: 1040px){
+      #chartCol { display:block; }
+      #chartCol.hiddenWide { display:none; }
+    }
+    .chartHeader{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-bottom:10px;
+    }
+    .chartControls{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
+      margin-top:10px;
+    }
+    .chartCanvasWrap{
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      background: var(--bg);
+      padding: 8px;
+    }
+    canvas{
+      width: 100%;
+      height: 240px;
+      display:block;
+    }
+    .kpiRow{
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      flex-wrap:wrap;
+      margin:10px 0 0;
+      font-size:12px;
+      color:var(--muted);
     }
   </style>
 </head>
@@ -353,9 +398,9 @@
         <p id="authMsg" class="small muted" style="margin:0;"></p>
       </div>
 
-      <!-- RIGHT: Alerts -->
+      <!-- MIDDLE: Alerts -->
       <div>
-        <!-- NEW: Filter bar (shows when you click an alert) -->
+        <!-- Filter bar (shows when you click an alert) -->
         <div id="filterBar" class="card" style="display:none; margin-bottom:12px;">
           <div class="alertTop" style="margin-bottom:0;">
             <span id="filterBadge" class="alertBadge"><span class="emoji">🔎</span> Sensor</span>
@@ -370,6 +415,50 @@
         <div id="empty" class="empty" style="display:none;">
           No alerts yet.<br><br>
           Trigger your system or wait for the next alert.
+        </div>
+      </div>
+
+      <!-- RIGHT: Chart (third column) -->
+      <div id="chartCol" class="card hiddenWide">
+        <div class="chartHeader">
+          <span id="chartTitle" class="alertBadge"><span class="emoji">📈</span> Sensor chart</span>
+          <button id="closeChartBtn" class="danger">Close</button>
+        </div>
+
+        <p class="small muted" style="margin:0 0 10px;">
+          This graph shows alert <span class="mono">event counts</span> over time for the selected sensor on the currently selected device.
+        </p>
+
+        <div class="chartControls">
+          <div style="flex:1; min-width:180px;">
+            <label style="margin:0 0 6px;">Time range</label>
+            <select id="chartRange">
+              <option value="24h">Last 24 hours</option>
+              <option value="7d" selected>Last 7 days</option>
+              <option value="30d">Last 30 days</option>
+              <option value="all">All (within loaded alerts)</option>
+            </select>
+          </div>
+          <div style="flex:1; min-width:180px;">
+            <label style="margin:0 0 6px;">Buckets</label>
+            <select id="chartBucket">
+              <option value="auto" selected>Auto</option>
+              <option value="1h">1 hour</option>
+              <option value="6h">6 hours</option>
+              <option value="1d">1 day</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="chartCanvasWrap">
+          <canvas id="chartCanvas" width="600" height="260"></canvas>
+        </div>
+
+        <div class="kpiRow">
+          <span id="kpiCount">—</span>
+          <span id="kpiFromTo">—</span>
         </div>
       </div>
     </div>
@@ -435,15 +524,28 @@
     const deleteDeviceSelect = document.getElementById("deleteDeviceSelect");
     const deleteDeviceBtn = document.getElementById("deleteDeviceBtn");
 
-    // NEW: filter UI refs
+    // filter UI refs
     const filterBar = document.getElementById("filterBar");
     const filterBadge = document.getElementById("filterBadge");
     const clearFilterBtn = document.getElementById("clearFilterBtn");
 
-    // NEW: keep last loaded alerts so we can re-render filtered view without refetching
+    // chart UI refs
+    const chartCol = document.getElementById("chartCol");
+    const chartTitle = document.getElementById("chartTitle");
+    const closeChartBtn = document.getElementById("closeChartBtn");
+    const chartRange = document.getElementById("chartRange");
+    const chartBucket = document.getElementById("chartBucket");
+    const chartCanvas = document.getElementById("chartCanvas");
+    const kpiCount = document.getElementById("kpiCount");
+    const kpiFromTo = document.getElementById("kpiFromTo");
+
+    // keep last loaded alerts so we can re-render filtered view without refetching
     let lastLoaded = { deviceId: "", items: [] };
-    // NEW: current sensor filter (klass.type) or null for all
+    // current sensor filter (klass.type) or null for all
     let currentSensorFilter = null;
+
+    // current chart selection (klass data) or null
+    let currentChart = null;
 
     intervalLabelEl.textContent = REFRESH_SECONDS;
 
@@ -478,6 +580,12 @@
       const d = new Date(ms);
       if (isNaN(d.getTime())) return String(ts);
       return d.toLocaleString();
+    }
+
+    function tsToMs(ts){
+      const n = Number(ts);
+      if (!isFinite(n) || n <= 0) return 0;
+      return (n > 1577836800) ? (n * 1000) : n;
     }
 
     // ---------- Local hide (per device) ----------
@@ -524,7 +632,7 @@
       return { type: "info", label: "Alert", emoji: "🔔" };
     }
 
-    // NEW: filter bar helpers
+    // filter bar helpers
     function applySensorFilter(type, label, emoji){
       currentSensorFilter = type || null;
 
@@ -535,12 +643,235 @@
         filterBadge.innerHTML = `<span class="emoji">${emoji || "🔎"}</span> ${label || type}`;
       }
 
-      // re-render using last loaded items (no refetch)
       const deviceId = lastLoaded.deviceId || deviceSelect.value || "none";
       renderItems(deviceId, lastLoaded.items || []);
     }
 
     clearFilterBtn.onclick = () => applySensorFilter(null);
+
+    /* =========================================================
+       NEW: Chart helpers
+       ========================================================= */
+    function openChartForSensor(klass){
+      currentChart = klass ? { ...klass } : null;
+
+      if (!currentChart){
+        closeChart();
+        return;
+      }
+
+      chartCol.classList.remove("hiddenWide");
+
+      chartTitle.innerHTML = `<span class="emoji">${currentChart.emoji || "📈"}</span> ${currentChart.label || currentChart.type} chart`;
+
+      // draw immediately from lastLoaded
+      drawChartFromState();
+    }
+
+    function closeChart(){
+      currentChart = null;
+      chartCol.classList.add("hiddenWide");
+      // keep canvas but clear KPIs
+      kpiCount.textContent = "—";
+      kpiFromTo.textContent = "—";
+      clearCanvas();
+    }
+
+    closeChartBtn.onclick = closeChart;
+
+    function clearCanvas(){
+      const ctx = chartCanvas.getContext("2d");
+      const dpr = window.devicePixelRatio || 1;
+      const cssW = chartCanvas.clientWidth || 600;
+      const cssH = chartCanvas.clientHeight || 240;
+      chartCanvas.width = Math.floor(cssW * dpr);
+      chartCanvas.height = Math.floor(cssH * dpr);
+      ctx.setTransform(1,0,0,1,0,0);
+      ctx.clearRect(0,0,chartCanvas.width, chartCanvas.height);
+    }
+
+    function getCssVar(name){
+      return getComputedStyle(document.body).getPropertyValue(name).trim();
+    }
+
+    function pickBucketMs(rangeVal, bucketVal){
+      if (bucketVal && bucketVal !== "auto"){
+        if (bucketVal === "1h") return 60 * 60 * 1000;
+        if (bucketVal === "6h") return 6 * 60 * 60 * 1000;
+        if (bucketVal === "1d") return 24 * 60 * 60 * 1000;
+      }
+      // auto by range
+      if (rangeVal === "24h") return 60 * 60 * 1000;          // 1h
+      if (rangeVal === "7d") return 6 * 60 * 60 * 1000;       // 6h
+      if (rangeVal === "30d") return 24 * 60 * 60 * 1000;     // 1d
+      return 24 * 60 * 60 * 1000;                              // all -> 1d
+    }
+
+    function rangeStartMs(rangeVal, allMsSortedAsc){
+      const now = Date.now();
+      if (rangeVal === "24h") return now - 24 * 60 * 60 * 1000;
+      if (rangeVal === "7d") return now - 7 * 24 * 60 * 60 * 1000;
+      if (rangeVal === "30d") return now - 30 * 24 * 60 * 60 * 1000;
+      // all: start at first event (within loaded alerts)
+      return allMsSortedAsc.length ? allMsSortedAsc[0] : now - 7 * 24 * 60 * 60 * 1000;
+    }
+
+    function niceTimeLabel(ms){
+      const d = new Date(ms);
+      // short label: M/D HH or M/D
+      const mo = d.getMonth() + 1;
+      const da = d.getDate();
+      const hh = d.getHours();
+      const mm = String(d.getMinutes()).padStart(2,"0");
+      return `${mo}/${da} ${hh}:${mm}`;
+    }
+
+    function drawChartFromState(){
+      if (!currentChart) return;
+
+      const deviceId = lastLoaded.deviceId || deviceSelect.value || "";
+      const hidden = loadHiddenSet(deviceId);
+      const type = currentChart.type;
+
+      // Use loaded alerts, respect "hidden" keys
+      const points = (lastLoaded.items || [])
+        .filter(x => x && x.key && !hidden.has(x.key))
+        .filter(x => classifyAlert(x.msg).type === type)
+        .map(x => tsToMs(x.ts))
+        .filter(ms => ms > 0)
+        .sort((a,b) => a-b);
+
+      const rangeVal = chartRange.value;
+      const bucketMs = pickBucketMs(rangeVal, chartBucket.value);
+      const startMs = rangeStartMs(rangeVal, points);
+      const endMs = Date.now();
+
+      // clamp to [startMs, endMs]
+      const inRange = points.filter(ms => ms >= startMs && ms <= endMs);
+
+      // make buckets
+      const startAligned = Math.floor(startMs / bucketMs) * bucketMs;
+      const endAligned = Math.ceil(endMs / bucketMs) * bucketMs;
+
+      const bucketCount = Math.max(1, Math.min(4000, Math.round((endAligned - startAligned) / bucketMs)));
+      const buckets = new Array(bucketCount).fill(0).map((_, i) => ({
+        t: startAligned + i * bucketMs,
+        y: 0
+      }));
+
+      for (const ms of inRange){
+        const idx = Math.floor((ms - startAligned) / bucketMs);
+        if (idx >= 0 && idx < buckets.length) buckets[idx].y += 1;
+      }
+
+      // KPIs
+      kpiCount.textContent = `Events: ${inRange.length}`;
+      const fromTxt = new Date(startMs).toLocaleString();
+      const toTxt = new Date(endMs).toLocaleString();
+      kpiFromTo.textContent = `Range: ${fromTxt} → ${toTxt}`;
+
+      // draw
+      drawLineChart(buckets, type);
+    }
+
+    function drawLineChart(buckets, type){
+      const ctx = chartCanvas.getContext("2d");
+      const dpr = window.devicePixelRatio || 1;
+
+      const cssW = chartCanvas.clientWidth || 600;
+      const cssH = chartCanvas.clientHeight || 240;
+      chartCanvas.width = Math.floor(cssW * dpr);
+      chartCanvas.height = Math.floor(cssH * dpr);
+
+      ctx.setTransform(dpr,0,0,dpr,0,0);
+      ctx.clearRect(0,0,cssW,cssH);
+
+      // colors
+      const colorVar = `--alert-${type}`;
+      const stroke = getCssVar(colorVar) || getCssVar("--alert-info") || "#2563eb";
+      const border = getCssVar("--border") || "#e5e7eb";
+      const text = getCssVar("--muted") || "#6b7280";
+
+      const padL = 44, padR = 10, padT = 14, padB = 28;
+      const w = cssW - padL - padR;
+      const h = cssH - padT - padB;
+
+      // axis + grid
+      const maxY = Math.max(1, ...buckets.map(b => b.y));
+      const yTicks = 4;
+
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = border;
+
+      // horizontal grid lines
+      for (let i=0; i<=yTicks; i++){
+        const y = padT + (h * i / yTicks);
+        ctx.beginPath();
+        ctx.moveTo(padL, y);
+        ctx.lineTo(padL + w, y);
+        ctx.stroke();
+      }
+
+      // y labels
+      ctx.fillStyle = text;
+      ctx.font = "12px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Arial, sans-serif";
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+      for (let i=0; i<=yTicks; i++){
+        const v = Math.round(maxY * (1 - i / yTicks));
+        const y = padT + (h * i / yTicks);
+        ctx.fillText(String(v), padL - 8, y);
+      }
+
+      // x labels (start, mid, end)
+      const t0 = buckets[0]?.t ?? Date.now();
+      const tMid = buckets[Math.floor(buckets.length/2)]?.t ?? t0;
+      const tEnd = buckets[buckets.length-1]?.t ?? t0;
+
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.fillText(niceTimeLabel(t0), padL, padT + h + 8);
+
+      ctx.textAlign = "center";
+      ctx.fillText(niceTimeLabel(tMid), padL + w/2, padT + h + 8);
+
+      ctx.textAlign = "right";
+      ctx.fillText(niceTimeLabel(tEnd), padL + w, padT + h + 8);
+
+      // plot line
+      const xForI = (i) => padL + (w * (buckets.length === 1 ? 0 : i / (buckets.length - 1)));
+      const yForVal = (val) => padT + (h * (1 - (val / maxY)));
+
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      buckets.forEach((b, i) => {
+        const x = xForI(i);
+        const y = yForVal(b.y);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+
+      // points
+      ctx.fillStyle = stroke;
+      buckets.forEach((b, i) => {
+        const x = xForI(i);
+        const y = yForVal(b.y);
+        ctx.beginPath();
+        ctx.arc(x, y, 2.5, 0, Math.PI*2);
+        ctx.fill();
+      });
+    }
+
+    // redraw chart on controls changes
+    chartRange.onchange = drawChartFromState;
+    chartBucket.onchange = drawChartFromState;
+
+    // redraw on resize (so canvas stays crisp)
+    window.addEventListener("resize", () => {
+      if (currentChart) drawChartFromState();
+    });
 
     function renderItems(deviceId, items) {
       listEl.innerHTML = "";
@@ -567,11 +898,14 @@
         const card = document.createElement("div");
         card.className = `card alertCard alert--${klass.type} alertClickable`;
 
-        // NEW: clicking the card filters to that sensor type
+        // Clicking the card:
+        // 1) filters to that sensor type (existing behavior)
+        // 2) opens the third-column chart for that sensor
         card.onclick = (ev) => {
-          // If user clicked the Hide button (or inside it), do not filter
+          // If user clicked the Hide button (or inside it), do not filter/open
           if (ev.target && ev.target.closest && ev.target.closest("button")) return;
           applySensorFilter(klass.type, klass.label, klass.emoji);
+          openChartForSensor(klass);
         };
 
         const top = document.createElement("div");
@@ -605,7 +939,7 @@
         const hideBtn = document.createElement("button");
         hideBtn.textContent = "Hide";
         hideBtn.onclick = (ev) => {
-          ev.stopPropagation(); // prevent card click filter
+          ev.stopPropagation(); // prevent card click
           hiddenKeys.add(item.key);
           saveHiddenSet(deviceId, hiddenKeys);
           loadAlertsForSelectedDevice();
@@ -688,6 +1022,8 @@
           lastLoaded = { deviceId, items: [] };
           renderItems(deviceId, []);
           setStatus(`Connected • ${deviceId} (no alerts)`, "ok");
+          // If chart open, redraw (will be empty)
+          if (currentChart) drawChartFromState();
           return;
         }
 
@@ -700,11 +1036,13 @@
 
         items.sort((a,b) => Number(b.ts||0) - Number(a.ts||0));
 
-        // NEW: store for filtering view
         lastLoaded = { deviceId, items };
 
         renderItems(deviceId, items);
         setStatus(`Connected • ${deviceId} • ${items.length} shown`, "ok");
+
+        // If chart open, update it with new data
+        if (currentChart) drawChartFromState();
       } catch (e){
         console.error(e);
         setStatus("Error loading alerts", "error");
@@ -817,7 +1155,6 @@
 
         if (!deleteDeviceSelect.disabled) deleteDeviceSelect.value = deviceId;
 
-        // Keep current filter, but refresh list
         await loadAlertsForSelectedDevice();
       } catch (e){
         console.error(e);
@@ -838,6 +1175,7 @@
     deviceSelect.onchange = async () => {
       // When switching devices, clear sensor filter so it doesn't look “empty”
       applySensorFilter(null);
+      // keep chart open, but it will redraw against the new device's loaded alerts after fetch
       await loadAlertsForSelectedDevice();
     };
 
@@ -872,7 +1210,6 @@
           deleteDeviceSelect.value = deviceSelect.value || deleteDeviceSelect.options[0]?.value || "";
         }
 
-        // If current filter is set, keep it; but if device changed, list updates
         await loadAlertsForSelectedDevice();
         setAuthMsg(`Deleted ${idToDelete}.`, "ok");
       } catch (e){
@@ -908,6 +1245,9 @@
       document.body.classList.toggle("dark", isDark);
       themeBtn.textContent = `Night mode: ${isDark ? "On" : "Off"}`;
       localStorage.setItem(THEME_KEY, mode);
+
+      // if chart is open, redraw with updated colors
+      if (currentChart) drawChartFromState();
     }
 
     (function initTheme(){
@@ -940,9 +1280,12 @@
         deleteDeviceSelect.innerHTML = "";
         deleteDeviceBtn.disabled = true;
 
-        // NEW: clear sensor filter UI/state on logout
+        // clear sensor filter UI/state on logout
         applySensorFilter(null);
         lastLoaded = { deviceId: "", items: [] };
+
+        // close chart on logout
+        closeChart();
 
         setStatus("Please log in", "warn");
         setAuthMsg("Log in to view alerts.", "muted");

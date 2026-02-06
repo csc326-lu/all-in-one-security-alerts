@@ -129,6 +129,7 @@
     }
     label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 6px; }
 
+    .error { color: var(-- increments?; } /* removed bad line */
     .error { color: var(--error); }
     .ok { color: var(--ok); }
     .warn { color: var(--warn); }
@@ -139,6 +140,16 @@
 
     .small { font-size: 12px; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+
+    .linkbtn{
+      background: none;
+      border: none;
+      padding: 0;
+      color: var(--pill-text);
+      cursor: pointer;
+      font-size: 12px;
+      text-decoration: underline;
+    }
   </style>
 </head>
 
@@ -165,16 +176,17 @@
       <div class="card">
         <h3 style="margin:0 0 8px;">Account</h3>
 
-        <div id="authPanel">
+        <!-- LOGIN VIEW -->
+        <div id="loginView">
           <label>Email</label>
-          <input id="email" type="email" placeholder="name@example.com" autocomplete="email"/>
+          <input id="loginEmail" type="email" placeholder="name@example.com" autocomplete="email"/>
 
           <label>Password</label>
-          <input id="password" type="password" placeholder="••••••••" autocomplete="current-password"/>
+          <input id="loginPassword" type="password" placeholder="••••••••" autocomplete="current-password"/>
 
           <div class="btnrow">
             <button id="loginBtn" class="primary">Log in</button>
-            <button id="signupBtn">Create account</button>
+            <button id="goSignupBtn">Create account</button>
           </div>
 
           <div class="divider"></div>
@@ -190,6 +202,32 @@
           </p>
         </div>
 
+        <!-- SIGNUP VIEW -->
+        <div id="signupView" style="display:none;">
+          <p class="small muted" style="margin:0 0 8px;">
+            Create a new account for the alerts dashboard.
+          </p>
+
+          <label>Email</label>
+          <input id="signupEmail" type="email" placeholder="name@example.com" autocomplete="email"/>
+
+          <label>Password</label>
+          <input id="signupPassword" type="password" placeholder="Create a password" autocomplete="new-password"/>
+
+          <label>Confirm Password</label>
+          <input id="signupPassword2" type="password" placeholder="Confirm password" autocomplete="new-password"/>
+
+          <div class="btnrow">
+            <button id="signupBtn" class="primary">Create account</button>
+            <button id="backToLoginBtn">Back to login</button>
+          </div>
+
+          <p class="small muted" style="margin:10px 0 0;">
+            After creating an account, you will be logged in automatically.
+          </p>
+        </div>
+
+        <!-- PAIRED / LOGGED-IN PANEL -->
         <div id="pairPanel" style="display:none;">
           <h3 style="margin:0 0 8px;">Pair a device</h3>
           <p class="small muted" style="margin:0 0 8px;">
@@ -236,9 +274,7 @@
   </main>
 
   <script type="module">
-    // ------------------------------------------------------------
     // Firebase SDK (v10 modular) via CDN modules
-    // ------------------------------------------------------------
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import {
       getAuth,
@@ -260,7 +296,6 @@
     } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
     // ========= YOUR FIREBASE WEB CONFIG =========
-    // Firebase Console -> Project settings -> General -> "Your apps" -> Web app -> config
     const firebaseConfig = {
       apiKey: "AIzaSyBk7o8KHY3qH3kCy-566j4_UKna8qkF0fM",
       authDomain: "all-in-one-security-system.firebaseapp.com",
@@ -270,12 +305,10 @@
       messagingSenderId: "503460021077",
       appId: "1:503460021077:web:ffbaa186aeb34a749ce5dc"
     };
-    // ===========================================
 
     // ========= UI CONFIG =========
     let REFRESH_SECONDS = 2;
     const MAX_ITEMS = 50;
-    // =============================
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
@@ -287,23 +320,15 @@
     const intervalLabelEl = document.getElementById("intervalLabel");
     const userLabelEl = document.getElementById("userLabel");
     const logoutBtn = document.getElementById("logoutBtn");
-
-    const authPanel = document.getElementById("authPanel");
-    const pairPanel = document.getElementById("pairPanel");
     const authMsg = document.getElementById("authMsg");
+
+    const loginView = document.getElementById("loginView");
+    const signupView = document.getElementById("signupView");
+    const pairPanel = document.getElementById("pairPanel");
 
     const deviceSelect = document.getElementById("deviceSelect");
 
     intervalLabelEl.textContent = REFRESH_SECONDS;
-
-    // ---------- Local hide (per device) ----------
-    function hiddenKeyForDevice(deviceId){ return `hiddenAlertKeys:${deviceId}`; }
-    function loadHiddenSet(deviceId){
-      return new Set(JSON.parse(localStorage.getItem(hiddenKeyForDevice(deviceId)) || "[]"));
-    }
-    function saveHiddenSet(deviceId, setObj){
-      localStorage.setItem(hiddenKeyForDevice(deviceId), JSON.stringify(Array.from(setObj)));
-    }
 
     function setStatus(text, kind) {
       statusEl.textContent = text;
@@ -317,6 +342,18 @@
       authMsg.classList.add(kind || "muted");
     }
 
+    function showAuthView(which){
+      // which = "login" | "signup"
+      if (which === "signup"){
+        loginView.style.display = "none";
+        signupView.style.display = "block";
+      } else {
+        signupView.style.display = "none";
+        loginView.style.display = "block";
+      }
+      pairPanel.style.display = "none";
+    }
+
     function formatTs(ts) {
       const n = Number(ts);
       if (!isFinite(n) || n <= 0) return "time unknown";
@@ -324,6 +361,15 @@
       const d = new Date(ms);
       if (isNaN(d.getTime())) return String(ts);
       return d.toLocaleString();
+    }
+
+    // ---------- Local hide (per device) ----------
+    function hiddenKeyForDevice(deviceId){ return `hiddenAlertKeys:${deviceId}`; }
+    function loadHiddenSet(deviceId){
+      return new Set(JSON.parse(localStorage.getItem(hiddenKeyForDevice(deviceId)) || "[]"));
+    }
+    function saveHiddenSet(deviceId, setObj){
+      localStorage.setItem(hiddenKeyForDevice(deviceId), JSON.stringify(Array.from(setObj)));
     }
 
     function renderItems(deviceId, items) {
@@ -445,13 +491,26 @@
     }
 
     // --------------------------
-    // Auth actions
+    // Auth actions (Login / Signup)
     // --------------------------
+    document.getElementById("goSignupBtn").onclick = () => {
+      setAuthMsg("", "muted");
+      showAuthView("signup");
+      // optional: carry email over
+      document.getElementById("signupEmail").value = document.getElementById("loginEmail").value.trim();
+    };
+
+    document.getElementById("backToLoginBtn").onclick = () => {
+      setAuthMsg("", "muted");
+      showAuthView("login");
+      document.getElementById("loginEmail").value = document.getElementById("signupEmail").value.trim();
+    };
+
     document.getElementById("loginBtn").onclick = async () => {
       try {
         setAuthMsg("Logging in…", "muted");
-        const email = document.getElementById("email").value.trim();
-        const pass  = document.getElementById("password").value;
+        const email = document.getElementById("loginEmail").value.trim();
+        const pass  = document.getElementById("loginPassword").value;
         await signInWithEmailAndPassword(auth, email, pass);
         setAuthMsg("Logged in.", "ok");
       } catch (e){
@@ -462,10 +521,25 @@
 
     document.getElementById("signupBtn").onclick = async () => {
       try {
+        const email = document.getElementById("signupEmail").value.trim();
+        const pass1 = document.getElementById("signupPassword").value;
+        const pass2 = document.getElementById("signupPassword2").value;
+
+        if (!email || !pass1 || !pass2){
+          setAuthMsg("Please fill out all signup fields.", "warn");
+          return;
+        }
+        if (pass1.length < 6){
+          setAuthMsg("Password must be at least 6 characters.", "warn");
+          return;
+        }
+        if (pass1 !== pass2){
+          setAuthMsg("Passwords do not match.", "warn");
+          return;
+        }
+
         setAuthMsg("Creating account…", "muted");
-        const email = document.getElementById("email").value.trim();
-        const pass  = document.getElementById("password").value;
-        await createUserWithEmailAndPassword(auth, email, pass);
+        await createUserWithEmailAndPassword(auth, email, pass1);
         setAuthMsg("Account created & logged in.", "ok");
       } catch (e){
         console.error(e);
@@ -511,7 +585,6 @@
       try {
         setAuthMsg("Pairing device…", "muted");
 
-        // This write is allowed ONLY if pairCode matches /devices/{deviceId}/pairCode
         await set(ref(db, `users/${user.uid}/devices/${deviceId}`), {
           pairedAt: Date.now(),
           code: pairCode
@@ -549,7 +622,6 @@
       const deviceId = deviceSelect.value;
       if (!user || !deviceId) return;
 
-      // Hide currently loaded cards locally
       const keys = [];
       listEl.querySelectorAll(".card .meta .mono").forEach(el => keys.push(el.textContent.trim()));
       const hidden = loadHiddenSet(deviceId);
@@ -592,8 +664,10 @@
       if (!user){
         userLabelEl.textContent = "—";
         logoutBtn.style.display = "none";
-        authPanel.style.display = "block";
-        pairPanel.style.display = "none";
+
+        // show auth views, hide pair panel
+        showAuthView("login");
+
         deviceSelect.innerHTML = "";
         setStatus("Please log in", "warn");
         setAuthMsg("Log in to view alerts.", "muted");
@@ -603,8 +677,12 @@
 
       userLabelEl.textContent = user.email || user.uid;
       logoutBtn.style.display = "inline-block";
-      authPanel.style.display = "none";
+
+      // hide auth views, show pairing
+      loginView.style.display = "none";
+      signupView.style.display = "none";
       pairPanel.style.display = "block";
+
       setAuthMsg("Logged in. Pair a device or select one.", "ok");
 
       await loadDevicesForUser(user.uid);

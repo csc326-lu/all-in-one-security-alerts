@@ -9,3 +9,4 @@
 - Merge "manage paired devices" / "your paired devices"
 - All columns should be centered
 - Option to organize alert column by time and type
+- Option to change auto refresh time

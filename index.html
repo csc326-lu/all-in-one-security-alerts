@@ -255,6 +255,22 @@
           <p class="small muted" style="margin:10px 0 0;">
             Pairing is saved to your account in Firebase, so you can log out/in and keep access.
           </p>
+
+          <!-- NEW: Manage/Delete paired devices -->
+          <div class="divider"></div>
+
+          <h3 style="margin:0 0 8px;">Manage paired devices</h3>
+          <p class="small muted" style="margin:0 0 8px;">
+            Deleting a device here removes it from <span class="mono">your account</span> only. It does not delete alerts in Firebase.
+          </p>
+
+          <label>Delete a paired device</label>
+          <select id="deleteDeviceSelect"></select>
+
+          <div class="btnrow">
+            <button id="deleteDeviceBtn" class="danger">Delete device</button>
+          </div>
+          <!-- END NEW -->
         </div>
 
         <div class="divider"></div>
@@ -289,6 +305,7 @@
       ref,
       get,
       set,
+      remove,
       query,
       orderByChild,
       limitToLast
@@ -326,6 +343,10 @@
     const pairPanel = document.getElementById("pairPanel");
 
     const deviceSelect = document.getElementById("deviceSelect");
+
+    // NEW: delete UI refs
+    const deleteDeviceSelect = document.getElementById("deleteDeviceSelect");
+    const deleteDeviceBtn = document.getElementById("deleteDeviceBtn");
 
     intervalLabelEl.textContent = REFRESH_SECONDS;
 
@@ -418,27 +439,41 @@
       }
     }
 
+    function fillSelect(selectEl, ids, emptyText){
+      selectEl.innerHTML = "";
+      if (!ids || ids.length === 0){
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = emptyText;
+        selectEl.appendChild(opt);
+        selectEl.disabled = true;
+        return;
+      }
+      selectEl.disabled = false;
+      for (const id of ids.sort()){
+        const opt = document.createElement("option");
+        opt.value = id;
+        opt.textContent = id;
+        selectEl.appendChild(opt);
+      }
+    }
+
     async function loadDevicesForUser(uid){
       deviceSelect.innerHTML = "";
       const snap = await get(ref(db, `users/${uid}/devices`));
       const val = snap.exists() ? snap.val() : null;
 
       const ids = val ? Object.keys(val) : [];
-      if (ids.length === 0){
-        const opt = document.createElement("option");
-        opt.value = "";
-        opt.textContent = "No devices paired yet";
-        deviceSelect.appendChild(opt);
-        deviceSelect.disabled = true;
-        return;
-      }
 
-      deviceSelect.disabled = false;
-      for (const id of ids.sort()){
-        const opt = document.createElement("option");
-        opt.value = id;
-        opt.textContent = id;
-        deviceSelect.appendChild(opt);
+      // existing behavior for deviceSelect (unchanged logic, just routed through helper)
+      fillSelect(deviceSelect, ids, "No devices paired yet");
+
+      // NEW: keep delete dropdown in sync
+      fillSelect(deleteDeviceSelect, ids, "No devices to delete");
+      deleteDeviceBtn.disabled = !(ids && ids.length);
+
+      if (ids.length === 0){
+        return;
       }
     }
 
@@ -592,6 +627,10 @@
         setAuthMsg(`Paired ${deviceId}.`, "ok");
         await loadDevicesForUser(user.uid);
         deviceSelect.value = deviceId;
+
+        // keep delete dropdown consistent too
+        if (!deleteDeviceSelect.disabled) deleteDeviceSelect.value = deviceId;
+
         await loadAlertsForSelectedDevice();
       } catch (e){
         console.error(e);
@@ -610,6 +649,47 @@
     };
 
     deviceSelect.onchange = loadAlertsForSelectedDevice;
+
+    // --------------------------
+    // NEW: Delete paired device
+    // --------------------------
+    deleteDeviceBtn.onclick = async () => {
+      const user = auth.currentUser;
+      if (!user) return;
+
+      const idToDelete = (deleteDeviceSelect.value || "").trim();
+      if (!idToDelete){
+        setAuthMsg("No device selected to delete.", "warn");
+        return;
+      }
+
+      const ok = confirm(`Remove "${idToDelete}" from your paired devices?\n\nThis will remove access to its alerts for your account (it does not delete alerts in the database).`);
+      if (!ok) return;
+
+      try {
+        setAuthMsg(`Deleting ${idToDelete}…`, "muted");
+        await remove(ref(db, `users/${user.uid}/devices/${idToDelete}`));
+
+        await loadDevicesForUser(user.uid);
+
+        // If user deleted the currently selected device, switch to first available
+        if (deviceSelect.value === idToDelete){
+          const first = deviceSelect.options.length ? deviceSelect.options[0].value : "";
+          deviceSelect.value = first || "";
+        }
+
+        // keep delete dropdown valid
+        if (!deleteDeviceSelect.disabled){
+          deleteDeviceSelect.value = deviceSelect.value || deleteDeviceSelect.options[0]?.value || "";
+        }
+
+        await loadAlertsForSelectedDevice();
+        setAuthMsg(`Deleted ${idToDelete}.`, "ok");
+      } catch (e){
+        console.error(e);
+        setAuthMsg(e.message || "Delete failed", "error");
+      }
+    };
 
     // --------------------------
     // Buttons for alerts UI
@@ -668,6 +748,9 @@
         showAuthView("login");
 
         deviceSelect.innerHTML = "";
+        deleteDeviceSelect.innerHTML = "";
+        deleteDeviceBtn.disabled = true;
+
         setStatus("Please log in", "warn");
         setAuthMsg("Log in to view alerts.", "muted");
         renderItems("none", []);

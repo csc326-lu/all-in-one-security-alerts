@@ -1,4 +1,4 @@
-<!doctype html> 
+<!doctype html>  
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -228,7 +228,7 @@
     }
 
     /* =========================================================
-       NEW: Chart panel
+       Chart panel
        ========================================================= */
     #chartCol { display:none; }
     @media (min-width: 1040px){
@@ -406,9 +406,6 @@
             <span id="filterBadge" class="alertBadge"><span class="emoji">🔎</span> Sensor</span>
             <button id="clearFilterBtn" class="primary">Show all alerts</button>
           </div>
-          <p class="small muted" style="margin:10px 0 0;">
-            Showing alerts for the selected sensor type over time (newest first).
-          </p>
         </div>
 
         <div id="list"></div>
@@ -422,7 +419,6 @@
       <div id="chartCol" class="card hiddenWide">
         <div class="chartHeader">
           <span id="chartTitle" class="alertBadge"><span class="emoji">📈</span> Sensor chart</span>
-          <button id="closeChartBtn" class="danger">Close</button>
         </div>
 
         <p class="small muted" style="margin:0 0 10px;">
@@ -532,7 +528,6 @@
     // chart UI refs
     const chartCol = document.getElementById("chartCol");
     const chartTitle = document.getElementById("chartTitle");
-    const closeChartBtn = document.getElementById("closeChartBtn");
     const chartRange = document.getElementById("chartRange");
     const chartBucket = document.getElementById("chartBucket");
     const chartCanvas = document.getElementById("chartCanvas");
@@ -647,10 +642,13 @@
       renderItems(deviceId, lastLoaded.items || []);
     }
 
-    clearFilterBtn.onclick = () => applySensorFilter(null);
+    clearFilterBtn.onclick = () => {
+      applySensorFilter(null);
+      closeChart();
+    };
 
     /* =========================================================
-       NEW: Chart helpers
+       Chart helpers
        ========================================================= */
     function openChartForSensor(klass){
       currentChart = klass ? { ...klass } : null;
@@ -661,7 +659,6 @@
       }
 
       chartCol.classList.remove("hiddenWide");
-
       chartTitle.innerHTML = `<span class="emoji">${currentChart.emoji || "📈"}</span> ${currentChart.label || currentChart.type} chart`;
 
       // draw immediately from lastLoaded
@@ -671,13 +668,10 @@
     function closeChart(){
       currentChart = null;
       chartCol.classList.add("hiddenWide");
-      // keep canvas but clear KPIs
       kpiCount.textContent = "—";
       kpiFromTo.textContent = "—";
       clearCanvas();
     }
-
-    closeChartBtn.onclick = closeChart;
 
     function clearCanvas(){
       const ctx = chartCanvas.getContext("2d");
@@ -718,7 +712,6 @@
 
     function niceTimeLabel(ms){
       const d = new Date(ms);
-      // short label: M/D HH or M/D
       const mo = d.getMonth() + 1;
       const da = d.getDate();
       const hh = d.getHours();
@@ -733,7 +726,6 @@
       const hidden = loadHiddenSet(deviceId);
       const type = currentChart.type;
 
-      // Use loaded alerts, respect "hidden" keys
       const points = (lastLoaded.items || [])
         .filter(x => x && x.key && !hidden.has(x.key))
         .filter(x => classifyAlert(x.msg).type === type)
@@ -746,10 +738,8 @@
       const startMs = rangeStartMs(rangeVal, points);
       const endMs = Date.now();
 
-      // clamp to [startMs, endMs]
       const inRange = points.filter(ms => ms >= startMs && ms <= endMs);
 
-      // make buckets
       const startAligned = Math.floor(startMs / bucketMs) * bucketMs;
       const endAligned = Math.ceil(endMs / bucketMs) * bucketMs;
 
@@ -764,13 +754,11 @@
         if (idx >= 0 && idx < buckets.length) buckets[idx].y += 1;
       }
 
-      // KPIs
       kpiCount.textContent = `Events: ${inRange.length}`;
       const fromTxt = new Date(startMs).toLocaleString();
       const toTxt = new Date(endMs).toLocaleString();
       kpiFromTo.textContent = `Range: ${fromTxt} → ${toTxt}`;
 
-      // draw
       drawLineChart(buckets, type);
     }
 
@@ -786,7 +774,6 @@
       ctx.setTransform(dpr,0,0,dpr,0,0);
       ctx.clearRect(0,0,cssW,cssH);
 
-      // colors
       const colorVar = `--alert-${type}`;
       const stroke = getCssVar(colorVar) || getCssVar("--alert-info") || "#2563eb";
       const border = getCssVar("--border") || "#e5e7eb";
@@ -796,14 +783,12 @@
       const w = cssW - padL - padR;
       const h = cssH - padT - padB;
 
-      // axis + grid
       const maxY = Math.max(1, ...buckets.map(b => b.y));
       const yTicks = 4;
 
       ctx.lineWidth = 1;
       ctx.strokeStyle = border;
 
-      // horizontal grid lines
       for (let i=0; i<=yTicks; i++){
         const y = padT + (h * i / yTicks);
         ctx.beginPath();
@@ -812,7 +797,6 @@
         ctx.stroke();
       }
 
-      // y labels
       ctx.fillStyle = text;
       ctx.font = "12px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Arial, sans-serif";
       ctx.textAlign = "right";
@@ -823,7 +807,6 @@
         ctx.fillText(String(v), padL - 8, y);
       }
 
-      // x labels (start, mid, end)
       const t0 = buckets[0]?.t ?? Date.now();
       const tMid = buckets[Math.floor(buckets.length/2)]?.t ?? t0;
       const tEnd = buckets[buckets.length-1]?.t ?? t0;
@@ -838,7 +821,6 @@
       ctx.textAlign = "right";
       ctx.fillText(niceTimeLabel(tEnd), padL + w, padT + h + 8);
 
-      // plot line
       const xForI = (i) => padL + (w * (buckets.length === 1 ? 0 : i / (buckets.length - 1)));
       const yForVal = (val) => padT + (h * (1 - (val / maxY)));
 
@@ -853,7 +835,6 @@
       });
       ctx.stroke();
 
-      // points
       ctx.fillStyle = stroke;
       buckets.forEach((b, i) => {
         const x = xForI(i);
@@ -864,11 +845,9 @@
       });
     }
 
-    // redraw chart on controls changes
     chartRange.onchange = drawChartFromState;
     chartBucket.onchange = drawChartFromState;
 
-    // redraw on resize (so canvas stays crisp)
     window.addEventListener("resize", () => {
       if (currentChart) drawChartFromState();
     });
@@ -877,7 +856,6 @@
       listEl.innerHTML = "";
       const hiddenKeys = loadHiddenSet(deviceId);
 
-      // Apply sensor filter (if set) + hidden filter
       const visible = items
         .filter(x => !hiddenKeys.has(x.key))
         .filter(x => {
@@ -898,12 +876,23 @@
         const card = document.createElement("div");
         card.className = `card alertCard alert--${klass.type} alertClickable`;
 
-        // Clicking the card:
-        // 1) filters to that sensor type (existing behavior)
-        // 2) opens the third-column chart for that sensor
+        // Clicking an alert toggles:
+        // - If you're already viewing THIS sensor (filter + chart open), clicking an alert returns to the normal list view.
+        // - Otherwise it opens filter + chart for that sensor.
         card.onclick = (ev) => {
-          // If user clicked the Hide button (or inside it), do not filter/open
           if (ev.target && ev.target.closest && ev.target.closest("button")) return;
+
+          const alreadyOnThisSensor =
+            currentSensorFilter === klass.type &&
+            currentChart &&
+            currentChart.type === klass.type;
+
+          if (alreadyOnThisSensor){
+            applySensorFilter(null);
+            closeChart();
+            return;
+          }
+
           applySensorFilter(klass.type, klass.label, klass.emoji);
           openChartForSensor(klass);
         };
@@ -939,7 +928,7 @@
         const hideBtn = document.createElement("button");
         hideBtn.textContent = "Hide";
         hideBtn.onclick = (ev) => {
-          ev.stopPropagation(); // prevent card click
+          ev.stopPropagation();
           hiddenKeys.add(item.key);
           saveHiddenSet(deviceId, hiddenKeys);
           loadAlertsForSelectedDevice();
@@ -1022,7 +1011,6 @@
           lastLoaded = { deviceId, items: [] };
           renderItems(deviceId, []);
           setStatus(`Connected • ${deviceId} (no alerts)`, "ok");
-          // If chart open, redraw (will be empty)
           if (currentChart) drawChartFromState();
           return;
         }
@@ -1041,7 +1029,6 @@
         renderItems(deviceId, items);
         setStatus(`Connected • ${deviceId} • ${items.length} shown`, "ok");
 
-        // If chart open, update it with new data
         if (currentChart) drawChartFromState();
       } catch (e){
         console.error(e);
@@ -1173,9 +1160,8 @@
     };
 
     deviceSelect.onchange = async () => {
-      // When switching devices, clear sensor filter so it doesn't look “empty”
       applySensorFilter(null);
-      // keep chart open, but it will redraw against the new device's loaded alerts after fetch
+      closeChart();
       await loadAlertsForSelectedDevice();
     };
 
@@ -1246,7 +1232,6 @@
       themeBtn.textContent = `Night mode: ${isDark ? "On" : "Off"}`;
       localStorage.setItem(THEME_KEY, mode);
 
-      // if chart is open, redraw with updated colors
       if (currentChart) drawChartFromState();
     }
 
@@ -1280,11 +1265,8 @@
         deleteDeviceSelect.innerHTML = "";
         deleteDeviceBtn.disabled = true;
 
-        // clear sensor filter UI/state on logout
         applySensorFilter(null);
         lastLoaded = { deviceId: "", items: [] };
-
-        // close chart on logout
         closeChart();
 
         setStatus("Please log in", "warn");

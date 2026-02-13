@@ -310,6 +310,39 @@
       padding:8px 10px;
       border-radius:10px;
     }
+
+    /* =========================================================
+       Dropdown panels (details/summary)
+       ========================================================= */
+    details.panel{
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      background: var(--surface);
+      margin: 0 0 12px;
+    }
+    details.panel > summary{
+      list-style: none;
+      cursor: pointer;
+      padding: 10px 12px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      user-select:none;
+      font-weight: 600;
+    }
+    details.panel > summary::-webkit-details-marker{ display:none; }
+    details.panel > summary .chev{
+      color: var(--muted);
+      font-size: 12px;
+    }
+    details.panel[open] > summary .chev{
+      transform: rotate(180deg);
+    }
+    details.panel .panelBody{
+      padding: 0 12px 12px;
+    }
   </style>
 </head>
 
@@ -389,35 +422,53 @@
 
         <!-- PAIRED / LOGGED-IN PANEL -->
         <div id="pairPanel" style="display:none;">
-          <h3 style="margin:0 0 8px;">Pair a device</h3>
-          <p class="small muted" style="margin:0 0 8px;">
-            Enter the Device ID + Pairing Code shown on the ESP8266 AP page.
-          </p>
 
-          <label>Device ID</label>
-          <input id="deviceId" placeholder="Example: SystemA" />
+          <!-- Pair a device (dropdown) -->
+          <details id="pairDetails" class="panel" open>
+            <summary>
+              <span>Pair a device</span>
+              <span class="chev">▼</span>
+            </summary>
+            <div class="panelBody">
+              <p class="small muted" style="margin:0 0 8px;">
+                Enter the Device ID + Pairing Code shown on the ESP8266 AP page.
+              </p>
 
-          <label>Pairing Code</label>
-          <input id="pairCode" placeholder="Example: 839201" />
+              <label>Device ID</label>
+              <input id="deviceId" placeholder="Example: SystemA" />
 
-          <div class="btnrow">
-            <button id="pairBtn" class="primary">Pair device</button>
-            <button id="reloadDevicesBtn">Reload devices</button>
-          </div>
+              <label>Pairing Code</label>
+              <input id="pairCode" placeholder="Example: 839201" />
 
-          <p class="small muted" style="margin:10px 0 0;">
-            Pairing is saved to your account in Firebase, so you can log out/in and keep access.
-          </p>
+              <div class="btnrow">
+                <button id="pairBtn" class="primary">Pair device</button>
+              </div>
 
-          <!-- Manage/Delete paired devices -->
-          <div class="divider"></div>
+              <p class="small muted" style="margin:10px 0 0;">
+                Pairing is saved to your account in Firebase, so you can log out/in and keep access.
+              </p>
+            </div>
+          </details>
 
-          <h3 style="margin:0 0 8px;">Manage paired devices</h3>
-          <p class="small muted" style="margin:0 0 8px;">
-            Tap a device to view its alerts. Deleting a device removes it from <span class="mono">your account</span> only (it does not delete alerts in Firebase).
-          </p>
+          <!-- Manage paired devices (dropdown) -->
+          <details id="manageDetails" class="panel" open>
+            <summary>
+              <span>Manage paired devices</span>
+              <span class="chev">▼</span>
+            </summary>
+            <div class="panelBody">
+              <p class="small muted" style="margin:0 0 8px;">
+                Tap a device to view its alerts. Deleting a device removes it from <span class="mono">your account</span> only (it does not delete alerts in Firebase).
+              </p>
 
-          <div id="deviceList" class="deviceList"></div>
+              <!-- moved reload button here -->
+              <div class="btnrow" style="margin-top:0;">
+                <button id="reloadDevicesBtn">Reload devices</button>
+              </div>
+
+              <div id="deviceList" class="deviceList"></div>
+            </div>
+          </details>
         </div>
 
         <div class="divider"></div>
@@ -539,6 +590,8 @@
     const loginView = document.getElementById("loginView");
     const signupView = document.getElementById("signupView");
     const pairPanel = document.getElementById("pairPanel");
+
+    const reloadDevicesBtn = document.getElementById("reloadDevicesBtn");
 
     // NOTE: keep a hidden select for compatibility (no longer shown in UI)
     const deviceSelect = document.createElement("select");
@@ -815,8 +868,6 @@
       const h = cssH - padT - padB;
 
       const maxY = Math.max(1, ...buckets.map(b => b.y));
-
-      // FIX: prevent duplicate Y-axis labels when maxY is small
       const yTicks = Math.max(1, Math.min(4, maxY));
 
       ctx.lineWidth = 1;
@@ -980,7 +1031,6 @@
     function setCurrentDevice(id){
       currentDeviceId = id || "";
       deviceSelect.value = currentDeviceId || "";
-      // highlight active device in UI list
       [...deviceListEl.querySelectorAll(".deviceRow")].forEach(row => {
         row.classList.toggle("active", row.dataset.deviceId === currentDeviceId);
       });
@@ -1022,7 +1072,6 @@
           await deleteDevice(id);
         };
 
-        // clicking the row also selects the device
         row.onclick = async () => {
           applySensorFilter(null);
           closeChart();
@@ -1036,7 +1085,6 @@
         deviceListEl.appendChild(row);
       }
 
-      // highlight active (if any)
       if (currentDeviceId){
         setCurrentDevice(currentDeviceId);
       }
@@ -1047,7 +1095,6 @@
       const val = snap.exists() ? snap.val() : null;
       const ids = val ? Object.keys(val) : [];
 
-      // keep hidden select synced (so existing logic can keep using it)
       deviceSelect.innerHTML = "";
       for (const id of ids.sort()){
         const opt = document.createElement("option");
@@ -1058,11 +1105,9 @@
 
       renderDeviceList(ids);
 
-      // choose a default device if none selected
       if (!currentDeviceId && ids.length){
         setCurrentDevice(ids.sort()[0]);
       } else if (currentDeviceId && !ids.includes(currentDeviceId)){
-        // current device was removed
         const next = ids.length ? ids.sort()[0] : "";
         setCurrentDevice(next);
       }
@@ -1117,7 +1162,6 @@
         renderItems(deviceId, items);
         setStatus(`Connected • ${deviceId} • ${items.length} shown`, "ok");
 
-        // refresh active highlight (in case auto-refresh runs)
         setCurrentDevice(deviceId);
 
         if (currentChart) drawChartFromState();
@@ -1138,7 +1182,6 @@
         setAuthMsg(`Deleting ${idToDelete}…`, "muted");
         await remove(ref(db, `users/${user.uid}/devices/${idToDelete}`));
 
-        // if we deleted the active device, clear filters/charts and pick next
         const wasActive = (currentDeviceId === idToDelete);
 
         await loadDevicesForUser(user.uid);
@@ -1146,7 +1189,6 @@
         if (wasActive){
           applySensorFilter(null);
           closeChart();
-          // load alerts for new active (if any)
           if (currentDeviceId) {
             await loadAlertsForSelectedDevice();
           } else {
@@ -1154,9 +1196,6 @@
             renderItems("none", []);
             setStatus("No device selected", "warn");
           }
-        } else {
-          // keep whatever is currently showing
-          setAuthMsg(`Deleted ${idToDelete}.`, "ok");
         }
 
         setAuthMsg(`Deleted ${idToDelete}.`, "ok");
@@ -1260,7 +1299,6 @@
       try {
         setAuthMsg("Pairing device…", "muted");
 
-        // IMPORTANT: rules require fields: pc + pairedAt
         await set(ref(db, `users/${user.uid}/devices/${deviceId}`), {
           pairedAt: Date.now(),
           pc: pairCode
@@ -1269,7 +1307,6 @@
         setAuthMsg(`Paired ${deviceId}.`, "ok");
         await loadDevicesForUser(user.uid);
 
-        // select the newly paired device + load its alerts
         applySensorFilter(null);
         closeChart();
         setCurrentDevice(deviceId);
@@ -1283,7 +1320,8 @@
       }
     };
 
-    document.getElementById("reloadDevicesBtn").onclick = async () => {
+    // moved reload button handler (same functionality)
+    reloadDevicesBtn.onclick = async () => {
       const user = auth.currentUser;
       if (!user) return;
       await loadDevicesForUser(user.uid);
@@ -1372,7 +1410,6 @@
 
       await loadDevicesForUser(user.uid);
 
-      // if we have a device, load it; otherwise show empty
       if (currentDeviceId){
         await loadAlertsForSelectedDevice();
       } else {

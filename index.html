@@ -392,6 +392,39 @@
       flex-direction:column;
       gap:8px;
     }
+
+    /* =========================================================
+       Reauth modal (for delete account)
+       ========================================================= */
+    .modalOverlay{
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding: 18px;
+      z-index: 50;
+    }
+    .modal{
+      width: 100%;
+      max-width: 420px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.18);
+    }
+    .modal h3{
+      margin: 0 0 6px;
+      font-size: 16px;
+    }
+    .modal p{
+      margin: 0 0 10px;
+    }
+    .modal .btnrow{
+      justify-content:flex-end;
+    }
   </style>
 </head>
 
@@ -404,7 +437,7 @@
 
       <!-- User button + dropdown menu -->
       <div class="userMenuWrap" id="userMenuWrap">
-        <button id="userMenuBtn" class="pillBtn" type="button" disabled>
+        <button id="userMenuBtn" class="pillBtn" type="button" disabled aria-expanded="false">
           <span>User:</span>
           <span id="userLabel" class="mono">—</span>
           <span class="mono" aria-hidden="true">▾</span>
@@ -605,6 +638,29 @@
     </div>
   </main>
 
+  <!-- Re-auth modal -->
+  <div id="reauthOverlay" class="modalOverlay" role="dialog" aria-modal="true" aria-label="Re-authenticate">
+    <div class="modal">
+      <h3>Confirm your password</h3>
+      <p class="small muted">
+        For security, Firebase requires a recent login before deleting your account.
+      </p>
+
+      <label>Email</label>
+      <input id="reauthEmail" type="email" disabled />
+
+      <label>Password</label>
+      <input id="reauthPass" type="password" placeholder="Enter your password" autocomplete="current-password" />
+
+      <div class="btnrow">
+        <button id="reauthCancelBtn" type="button">Cancel</button>
+        <button id="reauthConfirmBtn" class="danger" type="button">Continue</button>
+      </div>
+
+      <p id="reauthMsg" class="small muted" style="margin:10px 0 0;"></p>
+    </div>
+  </div>
+
   <script type="module">
     // Firebase SDK (v10 modular) via CDN modules
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -615,7 +671,9 @@
       createUserWithEmailAndPassword,
       signOut,
       sendPasswordResetEmail,
-      deleteUser
+      deleteUser,
+      EmailAuthProvider,
+      reauthenticateWithCredential
     } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
     import {
@@ -661,6 +719,14 @@
 
     const logoutBtn = document.getElementById("logoutBtn");
     const deleteAccountBtn = document.getElementById("deleteAccountBtn");
+
+    // Reauth modal refs
+    const reauthOverlay = document.getElementById("reauthOverlay");
+    const reauthEmail = document.getElementById("reauthEmail");
+    const reauthPass = document.getElementById("reauthPass");
+    const reauthCancelBtn = document.getElementById("reauthCancelBtn");
+    const reauthConfirmBtn = document.getElementById("reauthConfirmBtn");
+    const reauthMsg = document.getElementById("reauthMsg");
 
     const authMsg = document.getElementById("authMsg");
 
@@ -756,6 +822,26 @@
     document.addEventListener("click", () => closeUserMenu());
     userMenu.addEventListener("click", (ev) => ev.stopPropagation());
 
+    // --------------------------
+    // Reauth modal helpers
+    // --------------------------
+    function openReauthModal(email){
+      reauthMsg.textContent = "";
+      reauthPass.value = "";
+      reauthEmail.value = email || "";
+      reauthOverlay.style.display = "flex";
+      setTimeout(() => reauthPass.focus(), 30);
+    }
+    function closeReauthModal(){
+      reauthOverlay.style.display = "none";
+      reauthMsg.textContent = "";
+      reauthPass.value = "";
+    }
+    reauthCancelBtn.onclick = () => closeReauthModal();
+    reauthOverlay.addEventListener("click", (ev) => {
+      if (ev.target === reauthOverlay) closeReauthModal();
+    });
+
     function formatTs(ts) {
       const n = Number(ts);
       if (!isFinite(n) || n <= 0) return "time unknown";
@@ -849,7 +935,6 @@
       chartCol.classList.remove("hiddenWide");
       chartTitle.innerHTML = `<span class="emoji">${currentChart.emoji || "📈"}</span> ${currentChart.label || currentChart.type} chart`;
 
-      // draw immediately from lastLoaded
       drawChartFromState();
     }
 
@@ -882,11 +967,10 @@
         if (bucketVal === "6h") return 6 * 60 * 60 * 1000;
         if (bucketVal === "1d") return 24 * 60 * 60 * 1000;
       }
-      // auto by range
-      if (rangeVal === "24h") return 60 * 60 * 1000;          // 1h
-      if (rangeVal === "7d") return 6 * 60 * 60 * 1000;       // 6h
-      if (rangeVal === "30d") return 24 * 60 * 60 * 1000;     // 1d
-      return 24 * 60 * 60 * 1000;                              // all -> 1d
+      if (rangeVal === "24h") return 60 * 60 * 1000;
+      if (rangeVal === "7d") return 6 * 60 * 60 * 1000;
+      if (rangeVal === "30d") return 24 * 60 * 60 * 1000;
+      return 24 * 60 * 60 * 1000;
     }
 
     function rangeStartMs(rangeVal, allMsSortedAsc){
@@ -894,7 +978,6 @@
       if (rangeVal === "24h") return now - 24 * 60 * 60 * 1000;
       if (rangeVal === "7d") return now - 7 * 24 * 60 * 60 * 1000;
       if (rangeVal === "30d") return now - 30 * 24 * 60 * 60 * 1000;
-      // all: start at first event (within loaded alerts)
       return allMsSortedAsc.length ? allMsSortedAsc[0] : now - 7 * 24 * 60 * 60 * 1000;
     }
 
@@ -1389,6 +1472,21 @@
       await signOut(auth);
     };
 
+    async function deleteAccountFlow(){
+      const user = auth.currentUser;
+      if (!user) return;
+
+      // Step 1: delete DB user node (paired devices list), THEN delete auth user.
+      // If auth deletion fails with requires-recent-login, we will reauth and retry.
+      setAuthMsg("Deleting account…", "muted");
+
+      // Remove per-user data (does not touch alerts/{deviceId})
+      await remove(ref(db, `users/${user.uid}`));
+
+      // Delete auth user
+      await deleteUser(user);
+    }
+
     deleteAccountBtn.onclick = async () => {
       const user = auth.currentUser;
       if (!user) return;
@@ -1399,19 +1497,68 @@
       if (!ok) return;
 
       try {
-        setAuthMsg("Deleting account…", "muted");
-
-        // Remove your per-user pairing data (does not touch alerts/{deviceId})
-        await remove(ref(db, `users/${user.uid}`));
-
-        // Delete the auth user
-        await deleteUser(user);
-
+        await deleteAccountFlow();
         setAuthMsg("Account deleted.", "ok");
       } catch (e){
         console.error(e);
-        // Firebase may require a recent login to delete the user
-        setAuthMsg(e?.message || "Delete failed (you may need to log in again).", "error");
+
+        // ✅ If Firebase requires recent login, prompt for password and reauth, then retry.
+        if (e?.code === "auth/requires-recent-login"){
+          const email = user.email;
+          if (!email){
+            setAuthMsg("Delete failed: account has no email (cannot re-authenticate).", "error");
+            return;
+          }
+          openReauthModal(email);
+          return;
+        }
+
+        setAuthMsg(e?.message || "Delete failed.", "error");
+      }
+    };
+
+    // Reauth confirm -> reauthenticate -> retry delete
+    reauthConfirmBtn.onclick = async () => {
+      const user = auth.currentUser;
+      if (!user) { closeReauthModal(); return; }
+
+      const email = user.email;
+      const pass = reauthPass.value;
+
+      if (!email || !pass){
+        reauthMsg.textContent = "Enter your password to continue.";
+        reauthMsg.className = "small warn";
+        return;
+      }
+
+      try {
+        reauthConfirmBtn.disabled = true;
+        reauthCancelBtn.disabled = true;
+        reauthMsg.textContent = "Re-authenticating…";
+        reauthMsg.className = "small muted";
+
+        const cred = EmailAuthProvider.credential(email, pass);
+        await reauthenticateWithCredential(user, cred);
+
+        reauthMsg.textContent = "Re-authenticated. Deleting…";
+        reauthMsg.className = "small muted";
+
+        // Now retry (DB node may already be deleted; that's fine)
+        try {
+          await remove(ref(db, `users/${user.uid}`));
+        } catch (_) {}
+
+        await deleteUser(user);
+
+        closeReauthModal();
+        setAuthMsg("Account deleted.", "ok");
+      } catch (e){
+        console.error(e);
+        reauthMsg.textContent = e?.message || "Re-auth failed.";
+        reauthMsg.className = "small error";
+      } finally {
+        reauthConfirmBtn.disabled = false;
+        reauthCancelBtn.disabled = false;
       }
     };
 
@@ -1513,6 +1660,7 @@
     // --------------------------
     onAuthStateChanged(auth, async (user) => {
       closeUserMenu();
+      closeReauthModal();
 
       if (!user){
         userLabelEl.textContent = "—";

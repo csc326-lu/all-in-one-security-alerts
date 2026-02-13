@@ -343,6 +343,55 @@
     details.panel .panelBody{
       padding: 0 12px 12px;
     }
+
+    /* =========================================================
+       User menu (header dropdown)
+       ========================================================= */
+    .userMenuWrap{
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+    }
+    .pillBtn{
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: var(--pill-bg);
+      color: var(--pill-text);
+      font-size: 12px;
+      border: 1px solid var(--border);
+      white-space: nowrap;
+      cursor: pointer;
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .pillBtn:disabled{
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+    .userMenu{
+      position: absolute;
+      right: 0;
+      top: calc(100% + 8px);
+      min-width: 220px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+      z-index: 20;
+      display: none;
+    }
+    .userMenu .smallMuted{
+      font-size: 12px;
+      color: var(--muted);
+      margin: 0 0 8px;
+    }
+    .userMenu .btncol{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
   </style>
 </head>
 
@@ -352,14 +401,35 @@
     <div class="sub">
       <div id="status" class="pill muted">Loading…</div>
       <div class="pill">Auto refresh: <span id="intervalLabel">2</span>s</div>
-      <div class="pill">User: <span id="userLabel" class="mono">—</span></div>
+
+      <!-- User button + dropdown menu -->
+      <div class="userMenuWrap" id="userMenuWrap">
+        <button id="userMenuBtn" class="pillBtn" type="button" disabled>
+          <span>User:</span>
+          <span id="userLabel" class="mono">—</span>
+          <span class="mono" aria-hidden="true">▾</span>
+        </button>
+
+        <div id="userMenu" class="userMenu" role="menu" aria-label="User menu">
+          <p class="smallMuted">
+            Signed in as <span id="userMenuEmail" class="mono">—</span>
+          </p>
+          <div class="btncol">
+            <button id="logoutBtn" class="danger" type="button">Log out</button>
+            <button id="deleteAccountBtn" class="danger" type="button">Delete account</button>
+          </div>
+          <p class="small muted" style="margin:10px 0 0;">
+            Deleting your account removes your sign-in and paired-device list from your account. Alerts in Firebase are not deleted.
+          </p>
+        </div>
+      </div>
     </div>
 
     <div class="btnrow">
       <button id="refreshBtn">Refresh now</button>
       <button id="clearLocalBtn" title="Hides alerts locally (does not delete Firebase)">Clear on screen</button>
       <button id="themeBtn" title="Toggle night mode">Night mode: Off</button>
-      <button id="logoutBtn" class="danger" style="margin-left:auto; display:none;">Log out</button>
+      <!-- logout button moved into user menu -->
     </div>
   </header>
 
@@ -461,7 +531,6 @@
                 Tap a device to view its alerts. Deleting a device removes it from <span class="mono">your account</span> only (it does not delete alerts in Firebase).
               </p>
 
-              <!-- moved reload button here -->
               <div class="btnrow" style="margin-top:0;">
                 <button id="reloadDevicesBtn">Reload devices</button>
               </div>
@@ -477,7 +546,6 @@
 
       <!-- MIDDLE: Alerts -->
       <div>
-        <!-- Filter bar (shows when you click an alert) -->
         <div id="filterBar" class="card" style="display:none; margin-bottom:12px;">
           <div class="alertTop" style="margin-bottom:0;">
             <span id="filterBadge" class="alertBadge"><span class="emoji">🔎</span> Sensor</span>
@@ -546,7 +614,8 @@
       signInWithEmailAndPassword,
       createUserWithEmailAndPassword,
       signOut,
-      sendPasswordResetEmail
+      sendPasswordResetEmail,
+      deleteUser
     } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
     import {
@@ -583,8 +652,16 @@
     const listEl = document.getElementById("list");
     const emptyEl = document.getElementById("empty");
     const intervalLabelEl = document.getElementById("intervalLabel");
+
+    // User menu refs
+    const userMenuBtn = document.getElementById("userMenuBtn");
     const userLabelEl = document.getElementById("userLabel");
+    const userMenu = document.getElementById("userMenu");
+    const userMenuEmail = document.getElementById("userMenuEmail");
+
     const logoutBtn = document.getElementById("logoutBtn");
+    const deleteAccountBtn = document.getElementById("deleteAccountBtn");
+
     const authMsg = document.getElementById("authMsg");
 
     const loginView = document.getElementById("loginView");
@@ -651,6 +728,33 @@
       }
       pairPanel.style.display = "none";
     }
+
+    // --------------------------
+    // User menu behavior
+    // --------------------------
+    function closeUserMenu(){
+      userMenu.style.display = "none";
+      userMenuBtn.setAttribute("aria-expanded", "false");
+    }
+    function toggleUserMenu(){
+      const user = auth.currentUser;
+      if (!user) return;
+
+      const isOpen = userMenu.style.display === "block";
+      if (isOpen) closeUserMenu();
+      else {
+        userMenu.style.display = "block";
+        userMenuBtn.setAttribute("aria-expanded", "true");
+      }
+    }
+
+    userMenuBtn.onclick = (ev) => {
+      ev.stopPropagation();
+      toggleUserMenu();
+    };
+
+    document.addEventListener("click", () => closeUserMenu());
+    userMenu.addEventListener("click", (ev) => ev.stopPropagation());
 
     function formatTs(ts) {
       const n = Number(ts);
@@ -1277,8 +1381,38 @@
       }
     };
 
+    // --------------------------
+    // User menu actions (Logout / Delete account)
+    // --------------------------
     logoutBtn.onclick = async () => {
+      closeUserMenu();
       await signOut(auth);
+    };
+
+    deleteAccountBtn.onclick = async () => {
+      const user = auth.currentUser;
+      if (!user) return;
+
+      closeUserMenu();
+
+      const ok = confirm("Are you sure?\n\nThis will delete your account. This cannot be undone.");
+      if (!ok) return;
+
+      try {
+        setAuthMsg("Deleting account…", "muted");
+
+        // Remove your per-user pairing data (does not touch alerts/{deviceId})
+        await remove(ref(db, `users/${user.uid}`));
+
+        // Delete the auth user
+        await deleteUser(user);
+
+        setAuthMsg("Account deleted.", "ok");
+      } catch (e){
+        console.error(e);
+        // Firebase may require a recent login to delete the user
+        setAuthMsg(e?.message || "Delete failed (you may need to log in again).", "error");
+      }
     };
 
     // --------------------------
@@ -1320,7 +1454,6 @@
       }
     };
 
-    // moved reload button handler (same functionality)
     reloadDevicesBtn.onclick = async () => {
       const user = auth.currentUser;
       if (!user) return;
@@ -1379,9 +1512,12 @@
     // Auth state handler
     // --------------------------
     onAuthStateChanged(auth, async (user) => {
+      closeUserMenu();
+
       if (!user){
         userLabelEl.textContent = "—";
-        logoutBtn.style.display = "none";
+        userMenuEmail.textContent = "—";
+        userMenuBtn.disabled = true;
 
         showAuthView("login");
 
@@ -1399,8 +1535,11 @@
         return;
       }
 
-      userLabelEl.textContent = user.email || user.uid;
-      logoutBtn.style.display = "inline-block";
+      const label = user.email || user.uid;
+
+      userLabelEl.textContent = label;
+      userMenuEmail.textContent = label;
+      userMenuBtn.disabled = false;
 
       loginView.style.display = "none";
       signupView.style.display = "none";

@@ -1,4 +1,4 @@
-<!doctype html>  
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -784,7 +784,10 @@
       const h = cssH - padT - padB;
 
       const maxY = Math.max(1, ...buckets.map(b => b.y));
-      const yTicks = 4;
+
+      // FIX: prevent duplicate Y-axis labels when maxY is small
+      // (e.g., maxY=1 with 4 ticks caused repeated "1" and "0").
+      const yTicks = Math.max(1, Math.min(4, maxY));
 
       ctx.lineWidth = 1;
       ctx.strokeStyle = border;
@@ -801,7 +804,9 @@
       ctx.font = "12px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Arial, sans-serif";
       ctx.textAlign = "right";
       ctx.textBaseline = "middle";
+
       for (let i=0; i<=yTicks; i++){
+        // With yTicks <= maxY, rounding will not create duplicate integer labels.
         const v = Math.round(maxY * (1 - i / yTicks));
         const y = padT + (h * i / yTicks);
         ctx.fillText(String(v), padL - 8, y);

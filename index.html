@@ -271,6 +271,45 @@
       font-size:12px;
       color:var(--muted);
     }
+
+    /* =========================================================
+       Manage devices list
+       ========================================================= */
+    .deviceList{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      margin-top:10px;
+    }
+    .deviceRow{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding:10px;
+      border:1px solid var(--border);
+      border-radius:12px;
+      background: var(--bg);
+    }
+    .deviceRow .deviceName{
+      flex:1;
+      font-size:14px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .deviceRow.active{
+      outline: 2px solid var(--pill-text);
+      outline-offset: 1px;
+    }
+    .deviceRow .selectBtn{
+      padding:8px 10px;
+      border-radius:10px;
+    }
+    .deviceRow .delBtn{
+      padding:8px 10px;
+      border-radius:10px;
+    }
   </style>
 </head>
 
@@ -363,14 +402,6 @@
 
           <div class="btnrow">
             <button id="pairBtn" class="primary">Pair device</button>
-          </div>
-
-          <div class="divider"></div>
-
-          <label>Your paired devices</label>
-          <select id="deviceSelect"></select>
-
-          <div class="btnrow">
             <button id="reloadDevicesBtn">Reload devices</button>
           </div>
 
@@ -383,15 +414,10 @@
 
           <h3 style="margin:0 0 8px;">Manage paired devices</h3>
           <p class="small muted" style="margin:0 0 8px;">
-            Deleting a device here removes it from <span class="mono">your account</span> only. It does not delete alerts in Firebase.
+            Tap a device to view its alerts. Deleting a device removes it from <span class="mono">your account</span> only (it does not delete alerts in Firebase).
           </p>
 
-          <label>Delete a paired device</label>
-          <select id="deleteDeviceSelect"></select>
-
-          <div class="btnrow">
-            <button id="deleteDeviceBtn" class="danger">Delete device</button>
-          </div>
+          <div id="deviceList" class="deviceList"></div>
         </div>
 
         <div class="divider"></div>
@@ -514,11 +540,13 @@
     const signupView = document.getElementById("signupView");
     const pairPanel = document.getElementById("pairPanel");
 
-    const deviceSelect = document.getElementById("deviceSelect");
+    // NOTE: keep a hidden select for compatibility (no longer shown in UI)
+    const deviceSelect = document.createElement("select");
+    deviceSelect.style.display = "none";
+    deviceSelect.id = "deviceSelectHidden";
+    document.body.appendChild(deviceSelect);
 
-    // delete UI refs
-    const deleteDeviceSelect = document.getElementById("deleteDeviceSelect");
-    const deleteDeviceBtn = document.getElementById("deleteDeviceBtn");
+    const deviceListEl = document.getElementById("deviceList");
 
     // filter UI refs
     const filterBar = document.getElementById("filterBar");
@@ -541,6 +569,9 @@
 
     // current chart selection (klass data) or null
     let currentChart = null;
+
+    // current device selection
+    let currentDeviceId = "";
 
     intervalLabelEl.textContent = REFRESH_SECONDS;
 
@@ -638,7 +669,7 @@
         filterBadge.innerHTML = `<span class="emoji">${emoji || "🔎"}</span> ${label || type}`;
       }
 
-      const deviceId = lastLoaded.deviceId || deviceSelect.value || "none";
+      const deviceId = lastLoaded.deviceId || currentDeviceId || "none";
       renderItems(deviceId, lastLoaded.items || []);
     }
 
@@ -722,7 +753,7 @@
     function drawChartFromState(){
       if (!currentChart) return;
 
-      const deviceId = lastLoaded.deviceId || deviceSelect.value || "";
+      const deviceId = lastLoaded.deviceId || currentDeviceId || "";
       const hidden = loadHiddenSet(deviceId);
       const type = currentChart.type;
 
@@ -786,7 +817,6 @@
       const maxY = Math.max(1, ...buckets.map(b => b.y));
 
       // FIX: prevent duplicate Y-axis labels when maxY is small
-      // (e.g., maxY=1 with 4 ticks caused repeated "1" and "0").
       const yTicks = Math.max(1, Math.min(4, maxY));
 
       ctx.lineWidth = 1;
@@ -806,7 +836,6 @@
       ctx.textBaseline = "middle";
 
       for (let i=0; i<=yTicks; i++){
-        // With yTicks <= maxY, rounding will not create duplicate integer labels.
         const v = Math.round(maxY * (1 - i / yTicks));
         const y = padT + (h * i / yTicks);
         ctx.fillText(String(v), padL - 8, y);
@@ -881,9 +910,6 @@
         const card = document.createElement("div");
         card.className = `card alertCard alert--${klass.type} alertClickable`;
 
-        // Clicking an alert toggles:
-        // - If you're already viewing THIS sensor (filter + chart open), clicking an alert returns to the normal list view.
-        // - Otherwise it opens filter + chart for that sensor.
         card.onclick = (ev) => {
           if (ev.target && ev.target.closest && ev.target.closest("button")) return;
 
@@ -934,8 +960,9 @@
         hideBtn.textContent = "Hide";
         hideBtn.onclick = (ev) => {
           ev.stopPropagation();
-          hiddenKeys.add(item.key);
-          saveHiddenSet(deviceId, hiddenKeys);
+          const hidden = loadHiddenSet(deviceId);
+          hidden.add(item.key);
+          saveHiddenSet(deviceId, hidden);
           loadAlertsForSelectedDevice();
         };
 
@@ -950,38 +977,94 @@
       }
     }
 
-    function fillSelect(selectEl, ids, emptyText){
-      selectEl.innerHTML = "";
+    function setCurrentDevice(id){
+      currentDeviceId = id || "";
+      deviceSelect.value = currentDeviceId || "";
+      // highlight active device in UI list
+      [...deviceListEl.querySelectorAll(".deviceRow")].forEach(row => {
+        row.classList.toggle("active", row.dataset.deviceId === currentDeviceId);
+      });
+    }
+
+    function renderDeviceList(ids){
+      deviceListEl.innerHTML = "";
+
       if (!ids || ids.length === 0){
-        const opt = document.createElement("option");
-        opt.value = "";
-        opt.textContent = emptyText;
-        selectEl.appendChild(opt);
-        selectEl.disabled = true;
+        deviceListEl.innerHTML = `<div class="small muted">No devices paired yet.</div>`;
         return;
       }
-      selectEl.disabled = false;
+
       for (const id of ids.sort()){
-        const opt = document.createElement("option");
-        opt.value = id;
-        opt.textContent = id;
-        selectEl.appendChild(opt);
+        const row = document.createElement("div");
+        row.className = "deviceRow";
+        row.dataset.deviceId = id;
+
+        const name = document.createElement("div");
+        name.className = "deviceName";
+        name.textContent = id;
+
+        const selectBtn = document.createElement("button");
+        selectBtn.className = "selectBtn";
+        selectBtn.textContent = "View";
+        selectBtn.onclick = async (ev) => {
+          ev.stopPropagation();
+          applySensorFilter(null);
+          closeChart();
+          setCurrentDevice(id);
+          await loadAlertsForSelectedDevice();
+        };
+
+        const delBtn = document.createElement("button");
+        delBtn.className = "delBtn danger";
+        delBtn.textContent = "Delete";
+        delBtn.onclick = async (ev) => {
+          ev.stopPropagation();
+          await deleteDevice(id);
+        };
+
+        // clicking the row also selects the device
+        row.onclick = async () => {
+          applySensorFilter(null);
+          closeChart();
+          setCurrentDevice(id);
+          await loadAlertsForSelectedDevice();
+        };
+
+        row.appendChild(name);
+        row.appendChild(selectBtn);
+        row.appendChild(delBtn);
+        deviceListEl.appendChild(row);
+      }
+
+      // highlight active (if any)
+      if (currentDeviceId){
+        setCurrentDevice(currentDeviceId);
       }
     }
 
     async function loadDevicesForUser(uid){
-      deviceSelect.innerHTML = "";
       const snap = await get(ref(db, `users/${uid}/devices`));
       const val = snap.exists() ? snap.val() : null;
-
       const ids = val ? Object.keys(val) : [];
 
-      fillSelect(deviceSelect, ids, "No devices paired yet");
-      fillSelect(deleteDeviceSelect, ids, "No devices to delete");
-      deleteDeviceBtn.disabled = !(ids && ids.length);
+      // keep hidden select synced (so existing logic can keep using it)
+      deviceSelect.innerHTML = "";
+      for (const id of ids.sort()){
+        const opt = document.createElement("option");
+        opt.value = id;
+        opt.textContent = id;
+        deviceSelect.appendChild(opt);
+      }
 
-      if (ids.length === 0){
-        return;
+      renderDeviceList(ids);
+
+      // choose a default device if none selected
+      if (!currentDeviceId && ids.length){
+        setCurrentDevice(ids.sort()[0]);
+      } else if (currentDeviceId && !ids.includes(currentDeviceId)){
+        // current device was removed
+        const next = ids.length ? ids.sort()[0] : "";
+        setCurrentDevice(next);
       }
     }
 
@@ -994,7 +1077,7 @@
         return;
       }
 
-      const deviceId = deviceSelect.value;
+      const deviceId = currentDeviceId || deviceSelect.value;
       if (!deviceId) {
         lastLoaded = { deviceId: "", items: [] };
         renderItems("none", []);
@@ -1034,10 +1117,52 @@
         renderItems(deviceId, items);
         setStatus(`Connected • ${deviceId} • ${items.length} shown`, "ok");
 
+        // refresh active highlight (in case auto-refresh runs)
+        setCurrentDevice(deviceId);
+
         if (currentChart) drawChartFromState();
       } catch (e){
         console.error(e);
         setStatus("Error loading alerts", "error");
+      }
+    }
+
+    async function deleteDevice(idToDelete){
+      const user = auth.currentUser;
+      if (!user) return;
+
+      const ok = confirm(`Remove "${idToDelete}" from your paired devices?\n\nThis will remove access to its alerts for your account (it does not delete alerts in the database).`);
+      if (!ok) return;
+
+      try {
+        setAuthMsg(`Deleting ${idToDelete}…`, "muted");
+        await remove(ref(db, `users/${user.uid}/devices/${idToDelete}`));
+
+        // if we deleted the active device, clear filters/charts and pick next
+        const wasActive = (currentDeviceId === idToDelete);
+
+        await loadDevicesForUser(user.uid);
+
+        if (wasActive){
+          applySensorFilter(null);
+          closeChart();
+          // load alerts for new active (if any)
+          if (currentDeviceId) {
+            await loadAlertsForSelectedDevice();
+          } else {
+            lastLoaded = { deviceId: "", items: [] };
+            renderItems("none", []);
+            setStatus("No device selected", "warn");
+          }
+        } else {
+          // keep whatever is currently showing
+          setAuthMsg(`Deleted ${idToDelete}.`, "ok");
+        }
+
+        setAuthMsg(`Deleted ${idToDelete}.`, "ok");
+      } catch (e){
+        console.error(e);
+        setAuthMsg(e.message || "Delete failed", "error");
       }
     }
 
@@ -1143,10 +1268,11 @@
 
         setAuthMsg(`Paired ${deviceId}.`, "ok");
         await loadDevicesForUser(user.uid);
-        deviceSelect.value = deviceId;
 
-        if (!deleteDeviceSelect.disabled) deleteDeviceSelect.value = deviceId;
-
+        // select the newly paired device + load its alerts
+        applySensorFilter(null);
+        closeChart();
+        setCurrentDevice(deviceId);
         await loadAlertsForSelectedDevice();
       } catch (e){
         console.error(e);
@@ -1164,51 +1290,6 @@
       await loadAlertsForSelectedDevice();
     };
 
-    deviceSelect.onchange = async () => {
-      applySensorFilter(null);
-      closeChart();
-      await loadAlertsForSelectedDevice();
-    };
-
-    // --------------------------
-    // Delete paired device
-    // --------------------------
-    deleteDeviceBtn.onclick = async () => {
-      const user = auth.currentUser;
-      if (!user) return;
-
-      const idToDelete = (deleteDeviceSelect.value || "").trim();
-      if (!idToDelete){
-        setAuthMsg("No device selected to delete.", "warn");
-        return;
-      }
-
-      const ok = confirm(`Remove "${idToDelete}" from your paired devices?\n\nThis will remove access to its alerts for your account (it does not delete alerts in the database).`);
-      if (!ok) return;
-
-      try {
-        setAuthMsg(`Deleting ${idToDelete}…`, "muted");
-        await remove(ref(db, `users/${user.uid}/devices/${idToDelete}`));
-
-        await loadDevicesForUser(user.uid);
-
-        if (deviceSelect.value === idToDelete){
-          const first = deviceSelect.options.length ? deviceSelect.options[0].value : "";
-          deviceSelect.value = first || "";
-        }
-
-        if (!deleteDeviceSelect.disabled){
-          deleteDeviceSelect.value = deviceSelect.value || deleteDeviceSelect.options[0]?.value || "";
-        }
-
-        await loadAlertsForSelectedDevice();
-        setAuthMsg(`Deleted ${idToDelete}.`, "ok");
-      } catch (e){
-        console.error(e);
-        setAuthMsg(e.message || "Delete failed", "error");
-      }
-    };
-
     // --------------------------
     // Buttons for alerts UI
     // --------------------------
@@ -1216,7 +1297,7 @@
 
     document.getElementById("clearLocalBtn").onclick = () => {
       const user = auth.currentUser;
-      const deviceId = deviceSelect.value;
+      const deviceId = currentDeviceId;
       if (!user || !deviceId) return;
 
       const keys = [];
@@ -1266,13 +1347,13 @@
 
         showAuthView("login");
 
-        deviceSelect.innerHTML = "";
-        deleteDeviceSelect.innerHTML = "";
-        deleteDeviceBtn.disabled = true;
+        deviceListEl.innerHTML = "";
 
         applySensorFilter(null);
         lastLoaded = { deviceId: "", items: [] };
         closeChart();
+
+        currentDeviceId = "";
 
         setStatus("Please log in", "warn");
         setAuthMsg("Log in to view alerts.", "muted");
@@ -1290,11 +1371,21 @@
       setAuthMsg("Logged in. Pair a device or select one.", "ok");
 
       await loadDevicesForUser(user.uid);
-      await loadAlertsForSelectedDevice();
+
+      // if we have a device, load it; otherwise show empty
+      if (currentDeviceId){
+        await loadAlertsForSelectedDevice();
+      } else {
+        lastLoaded = { deviceId: "", items: [] };
+        renderItems("none", []);
+        setStatus("No device selected", "warn");
+      }
     });
 
-    // Auto refresh
-    setInterval(loadAlertsForSelectedDevice, REFRESH_SECONDS * 1000);
+    // Auto refresh (only when a device is selected + logged in)
+    setInterval(() => {
+      if (auth.currentUser && currentDeviceId) loadAlertsForSelectedDevice();
+    }, REFRESH_SECONDS * 1000);
   </script>
 </body>
 </html>

@@ -32,6 +32,9 @@
       --alert-temperature: #ea580c;/* orange */
       --alert-water: #0284c7;      /* cyan/blue */
       --alert-gas: #dc2626;        /* red */
+
+      /* JS will set this so the Account box sticks below the header */
+      --stickyTop: 92px;
     }
 
     body.dark {
@@ -164,6 +167,22 @@
       cursor: pointer;
       font-size: 12px;
       text-decoration: underline;
+    }
+
+    /* =========================================================
+       ✅ Sticky Account box (desktop only)
+       - Sticks under the sticky header
+       - Scrolls internally if it gets taller than the viewport
+       ========================================================= */
+    @media (min-width: 1040px){
+      #accountCol{
+        position: sticky;
+        top: var(--stickyTop);
+        align-self: start;
+        max-height: calc(100vh - var(--stickyTop) - 12px);
+        overflow: auto;
+        overscroll-behavior: contain;
+      }
     }
 
     /* =========================================================
@@ -429,7 +448,7 @@
 </head>
 
 <body>
-  <header>
+  <header id="topHeader">
     <h1>Security Alerts</h1>
     <div class="sub">
       <div id="status" class="pill muted">Loading…</div>
@@ -469,7 +488,7 @@
   <main>
     <div class="grid">
       <!-- LEFT: Auth + Pairing -->
-      <div class="card">
+      <div id="accountCol" class="card">
         <h3 style="margin:0 0 8px;">Account</h3>
 
         <!-- LOGIN VIEW -->
@@ -710,6 +729,16 @@
     const listEl = document.getElementById("list");
     const emptyEl = document.getElementById("empty");
     const intervalLabelEl = document.getElementById("intervalLabel");
+
+    // ✅ Measure header height and set --stickyTop so the Account box sticks *below* it.
+    const headerEl = document.getElementById("topHeader");
+    function updateStickyTop(){
+      const gap = 12; // matches grid gap / main padding spacing
+      const h = headerEl ? headerEl.offsetHeight : 80;
+      document.documentElement.style.setProperty("--stickyTop", `${h + gap}px`);
+    }
+    updateStickyTop();
+    window.addEventListener("resize", updateStickyTop);
 
     // User menu refs
     const userMenuBtn = document.getElementById("userMenuBtn");
@@ -1637,6 +1666,9 @@
       localStorage.setItem(THEME_KEY, mode);
 
       if (currentChart) drawChartFromState();
+
+      // header height can change slightly with fonts/colors; recompute sticky offset
+      updateStickyTop();
     }
 
     (function initTheme(){
@@ -1661,6 +1693,9 @@
     onAuthStateChanged(auth, async (user) => {
       closeUserMenu();
       closeReauthModal();
+
+      // header contents can change with user label; recompute sticky offset
+      updateStickyTop();
 
       if (!user){
         userLabelEl.textContent = "—";
@@ -1704,6 +1739,8 @@
         renderItems("none", []);
         setStatus("No device selected", "warn");
       }
+
+      updateStickyTop();
     });
 
     // Auto refresh (only when a device is selected + logged in)

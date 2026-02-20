@@ -1,4 +1,4 @@
-<!doctype html> 
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -270,6 +270,7 @@
       margin-top:10px;
     }
     .chartCanvasWrap{
+      position: relative; /* ✅ for tooltip positioning */
       border: 1px solid var(--border);
       border-radius: 12px;
       overflow: hidden;
@@ -281,14 +282,54 @@
       height: 240px;
       display:block;
     }
+
+    /* ✅ keep Range always below Events */
     .kpiRow{
       display:flex;
-      justify-content:space-between;
-      gap:12px;
-      flex-wrap:wrap;
+      flex-direction:column;
+      align-items:flex-start;
+      gap:6px;
       margin:10px 0 0;
       font-size:12px;
       color:var(--muted);
+    }
+
+    /* ✅ hover tooltip */
+    .chartTooltip{
+      position:absolute;
+      display:none;
+      z-index: 10;
+      pointer-events:none;
+      transform: translate(-50%, -115%);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 8px 10px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.12);
+      max-width: 260px;
+      line-height: 1.25;
+    }
+    .chartTooltip .row{
+      display:flex;
+      gap:8px;
+      align-items:flex-start;
+    }
+    .chartTooltip .icon{
+      font-size: 16px;
+      line-height: 1;
+      margin-top: 1px;
+    }
+    .chartTooltip .title{
+      font-size: 12px;
+      color: var(--text);
+      font-weight: 600;
+      margin: 0;
+    }
+    .chartTooltip .subtxt{
+      font-size: 12px;
+      color: var(--muted);
+      margin: 2px 0 0;
+      word-break: break-word;
     }
 
     /* =========================================================
@@ -654,6 +695,17 @@
 
         <div class="chartCanvasWrap">
           <canvas id="chartCanvas" width="600" height="260"></canvas>
+
+          <!-- ✅ hover tooltip -->
+          <div id="chartTooltip" class="chartTooltip" aria-hidden="true">
+            <div class="row">
+              <div class="icon">🕒</div>
+              <div>
+                <p id="chartTooltipTitle" class="title">—</p>
+                <p id="chartTooltipSub" class="subtxt">—</p>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="kpiRow">
@@ -798,6 +850,11 @@
     const chartTimeFormat = document.getElementById("chartTimeFormat");
     const TIMEFMT_KEY = "alertsChartTimeFormat"; // "24" | "12"
 
+    // ✅ hover tooltip refs
+    const chartTooltip = document.getElementById("chartTooltip");
+    const chartTooltipTitle = document.getElementById("chartTooltipTitle");
+    const chartTooltipSub = document.getElementById("chartTooltipSub");
+
     // keep last loaded alerts so we can re-render filtered view without refetching
     let lastLoaded = { deviceId: "", items: [] };
     // current sensor filter (klass.type) or null for all
@@ -808,6 +865,9 @@
 
     // current device selection
     let currentDeviceId = "";
+
+    // ✅ chart hover hit points
+    let chartHitPoints = []; // [{x,y,t,yVal, label}]
 
     intervalLabelEl.textContent = REFRESH_SECONDS;
 
@@ -984,6 +1044,7 @@
       kpiCount.textContent = "—";
       kpiFromTo.textContent = "—";
       clearCanvas();
+      hideChartTooltip();
     }
 
     function clearCanvas(){
@@ -995,6 +1056,8 @@
       chartCanvas.height = Math.floor(cssH * dpr);
       ctx.setTransform(1,0,0,1,0,0);
       ctx.clearRect(0,0,chartCanvas.width, chartCanvas.height);
+      chartHitPoints = [];
+      hideChartTooltip();
     }
 
     function getCssVar(name){
@@ -1045,7 +1108,7 @@
       return `${mo}/${da} ${hh}:${mm} ${ampm}`;
     }
 
-    // ✅ NEW: For "Range:" line (respects the same 12/24 toggle)
+    // For tooltips & Range line (respects the same 12/24 toggle)
     function formatRangeDateTime(ms){
       const d = new Date(ms);
       if (isNaN(d.getTime())) return String(ms);
@@ -1054,10 +1117,10 @@
       const da = d.getDate();
       const yr = d.getFullYear();
       const min = String(d.getMinutes()).padStart(2,"0");
+      const sec = String(d.getSeconds()).padStart(2,"0");
 
       if (is24Hour()){
         const hr24 = String(d.getHours()).padStart(2,"0");
-        const sec = String(d.getSeconds()).padStart(2,"0");
         return `${mo}/${da}/${yr} ${hr24}:${min}:${sec}`;
       }
 
@@ -1065,7 +1128,6 @@
       const ampm = hr >= 12 ? "PM" : "AM";
       hr = hr % 12;
       if (hr === 0) hr = 12;
-      const sec = String(d.getSeconds()).padStart(2,"0");
       return `${mo}/${da}/${yr} ${hr}:${min}:${sec} ${ampm}`;
     }
 
@@ -1109,10 +1171,27 @@
       const toTxt = formatRangeDateTime(endMs);
       kpiFromTo.textContent = `Range: ${fromTxt} → ${toTxt}`;
 
-      drawLineChart(buckets, type);
+      drawLineChart(buckets, type, currentChart);
     }
 
-    function drawLineChart(buckets, type){
+    function hideChartTooltip(){
+      chartTooltip.style.display = "none";
+      chartTooltip.setAttribute("aria-hidden", "true");
+    }
+
+    function showChartTooltip(pt){
+      const label = pt?.label || "Event point";
+      const when = formatRangeDateTime(pt.t);
+      chartTooltipTitle.textContent = `${label} • ${pt.yVal} event${pt.yVal === 1 ? "" : "s"}`;
+      chartTooltipSub.textContent = `${when}`;
+
+      chartTooltip.style.left = `${pt.x}px`;
+      chartTooltip.style.top = `${pt.y}px`;
+      chartTooltip.style.display = "block";
+      chartTooltip.setAttribute("aria-hidden", "false");
+    }
+
+    function drawLineChart(buckets, type, klass){
       const ctx = chartCanvas.getContext("2d");
       const dpr = window.devicePixelRatio || 1;
 
@@ -1186,6 +1265,8 @@
       });
       ctx.stroke();
 
+      // draw points + build hit map for hover
+      chartHitPoints = [];
       ctx.fillStyle = stroke;
       buckets.forEach((b, i) => {
         const x = xForI(i);
@@ -1193,13 +1274,60 @@
         ctx.beginPath();
         ctx.arc(x, y, 2.5, 0, Math.PI*2);
         ctx.fill();
+
+        chartHitPoints.push({
+          x,
+          y,
+          t: b.t,
+          yVal: b.y,
+          label: klass?.label || klass?.type || "Sensor"
+        });
+      });
+
+      hideChartTooltip();
+    }
+
+    // ✅ hover behavior: show icon tooltip w/ specific date+time when hovering points
+    function setupChartHover(){
+      const hitRadius = 10; // px
+      const hitRadius2 = hitRadius * hitRadius;
+
+      chartCanvas.addEventListener("mouseleave", () => hideChartTooltip());
+
+      chartCanvas.addEventListener("mousemove", (ev) => {
+        if (!currentChart || !chartHitPoints.length) { hideChartTooltip(); return; }
+
+        const rect = chartCanvas.getBoundingClientRect();
+        const mx = ev.clientX - rect.left;
+        const my = ev.clientY - rect.top;
+
+        // Find nearest point within radius
+        let best = null;
+        let bestD2 = Infinity;
+
+        for (const pt of chartHitPoints){
+          const dx = mx - pt.x;
+          const dy = my - pt.y;
+          const d2 = (dx*dx) + (dy*dy);
+          if (d2 < bestD2){
+            bestD2 = d2;
+            best = pt;
+          }
+        }
+
+        if (best && bestD2 <= hitRadius2){
+          showChartTooltip(best);
+        } else {
+          hideChartTooltip();
+        }
       });
     }
+    setupChartHover();
 
     chartRange.onchange = drawChartFromState;
     chartBucket.onchange = drawChartFromState;
 
-    // ✅ redraw when time format changes + persist choice
+    // ✅ init time format + persist choice
     (function initChartTimeFormat(){
       const saved = localStorage.getItem(TIMEFMT_KEY);
       if (saved === "12" || saved === "24") chartTimeFormat.value = saved;
@@ -1747,12 +1875,6 @@
       applyTheme(currentlyDark ? "light" : "dark");
     };
     // --------------------------------------
-
-    // ✅ Initialize chart time format from localStorage (already handled above)
-    (function initChartTimeFormat(){
-      const saved = localStorage.getItem(TIMEFMT_KEY);
-      if (saved === "12" || saved === "24") chartTimeFormat.value = saved;
-    })();
 
     // --------------------------
     // Auth state handler

@@ -640,6 +640,13 @@
               <option value="6h">6 hours</option>
               <option value="1d">1 day</option>
             </select>
+
+            <!-- ✅ NEW: time format toggle below Buckets -->
+            <label style="margin:10px 0 6px;">Time format</label>
+            <select id="chartTimeFormat">
+              <option value="24" selected>Military (24-hour)</option>
+              <option value="12">Standard (12-hour)</option>
+            </select>
           </div>
         </div>
 
@@ -786,6 +793,10 @@
     const chartCanvas = document.getElementById("chartCanvas");
     const kpiCount = document.getElementById("kpiCount");
     const kpiFromTo = document.getElementById("kpiFromTo");
+
+    // ✅ NEW: time format select + persistence
+    const chartTimeFormat = document.getElementById("chartTimeFormat");
+    const TIMEFMT_KEY = "alertsChartTimeFormat"; // "24" | "12"
 
     // keep last loaded alerts so we can re-render filtered view without refetching
     let lastLoaded = { deviceId: "", items: [] };
@@ -1010,13 +1021,27 @@
       return allMsSortedAsc.length ? allMsSortedAsc[0] : now - 7 * 24 * 60 * 60 * 1000;
     }
 
+    // ✅ NEW: chart time formatting
+    function is24Hour(){
+      return (chartTimeFormat?.value || "24") === "24";
+    }
+
     function niceTimeLabel(ms){
       const d = new Date(ms);
       const mo = d.getMonth() + 1;
       const da = d.getDate();
-      const hh = d.getHours();
       const mm = String(d.getMinutes()).padStart(2,"0");
-      return `${mo}/${da} ${hh}:${mm}`;
+
+      if (is24Hour()){
+        const hh24 = String(d.getHours()).padStart(2,"0");
+        return `${mo}/${da} ${hh24}:${mm}`;
+      }
+
+      let hh = d.getHours();
+      const ampm = hh >= 12 ? "PM" : "AM";
+      hh = hh % 12;
+      if (hh === 0) hh = 12;
+      return `${mo}/${da} ${hh}:${mm} ${ampm}`;
     }
 
     function drawChartFromState(){
@@ -1148,6 +1173,17 @@
 
     chartRange.onchange = drawChartFromState;
     chartBucket.onchange = drawChartFromState;
+
+    // ✅ NEW: redraw when time format changes + persist choice
+    (function initChartTimeFormat(){
+      const saved = localStorage.getItem(TIMEFMT_KEY);
+      if (saved === "12" || saved === "24") chartTimeFormat.value = saved;
+    })();
+
+    chartTimeFormat.onchange = () => {
+      localStorage.setItem(TIMEFMT_KEY, chartTimeFormat.value);
+      if (currentChart) drawChartFromState();
+    };
 
     window.addEventListener("resize", () => {
       if (currentChart) drawChartFromState();

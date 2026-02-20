@@ -1,4 +1,4 @@
-<!doctype html>
+<!doctype html> 
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -641,7 +641,7 @@
               <option value="1d">1 day</option>
             </select>
 
-            <!-- ✅ NEW: time format toggle below Buckets -->
+            <!-- ✅ time format toggle below Buckets -->
             <label style="margin:10px 0 6px;">Time format</label>
             <select id="chartTimeFormat">
               <option value="24" selected>Military (24-hour)</option>
@@ -794,7 +794,7 @@
     const kpiCount = document.getElementById("kpiCount");
     const kpiFromTo = document.getElementById("kpiFromTo");
 
-    // ✅ NEW: time format select + persistence
+    // ✅ time format select + persistence
     const chartTimeFormat = document.getElementById("chartTimeFormat");
     const TIMEFMT_KEY = "alertsChartTimeFormat"; // "24" | "12"
 
@@ -1021,11 +1021,12 @@
       return allMsSortedAsc.length ? allMsSortedAsc[0] : now - 7 * 24 * 60 * 60 * 1000;
     }
 
-    // ✅ NEW: chart time formatting
+    // ✅ chart time formatting helpers
     function is24Hour(){
       return (chartTimeFormat?.value || "24") === "24";
     }
 
+    // For x-axis labels (compact)
     function niceTimeLabel(ms){
       const d = new Date(ms);
       const mo = d.getMonth() + 1;
@@ -1042,6 +1043,30 @@
       hh = hh % 12;
       if (hh === 0) hh = 12;
       return `${mo}/${da} ${hh}:${mm} ${ampm}`;
+    }
+
+    // ✅ NEW: For "Range:" line (respects the same 12/24 toggle)
+    function formatRangeDateTime(ms){
+      const d = new Date(ms);
+      if (isNaN(d.getTime())) return String(ms);
+
+      const mo = d.getMonth() + 1;
+      const da = d.getDate();
+      const yr = d.getFullYear();
+      const min = String(d.getMinutes()).padStart(2,"0");
+
+      if (is24Hour()){
+        const hr24 = String(d.getHours()).padStart(2,"0");
+        const sec = String(d.getSeconds()).padStart(2,"0");
+        return `${mo}/${da}/${yr} ${hr24}:${min}:${sec}`;
+      }
+
+      let hr = d.getHours();
+      const ampm = hr >= 12 ? "PM" : "AM";
+      hr = hr % 12;
+      if (hr === 0) hr = 12;
+      const sec = String(d.getSeconds()).padStart(2,"0");
+      return `${mo}/${da}/${yr} ${hr}:${min}:${sec} ${ampm}`;
     }
 
     function drawChartFromState(){
@@ -1080,8 +1105,8 @@
       }
 
       kpiCount.textContent = `Events: ${inRange.length}`;
-      const fromTxt = new Date(startMs).toLocaleString();
-      const toTxt = new Date(endMs).toLocaleString();
+      const fromTxt = formatRangeDateTime(startMs);
+      const toTxt = formatRangeDateTime(endMs);
       kpiFromTo.textContent = `Range: ${fromTxt} → ${toTxt}`;
 
       drawLineChart(buckets, type);
@@ -1174,7 +1199,7 @@
     chartRange.onchange = drawChartFromState;
     chartBucket.onchange = drawChartFromState;
 
-    // ✅ NEW: redraw when time format changes + persist choice
+    // ✅ redraw when time format changes + persist choice
     (function initChartTimeFormat(){
       const saved = localStorage.getItem(TIMEFMT_KEY);
       if (saved === "12" || saved === "24") chartTimeFormat.value = saved;
@@ -1722,6 +1747,12 @@
       applyTheme(currentlyDark ? "light" : "dark");
     };
     // --------------------------------------
+
+    // ✅ Initialize chart time format from localStorage (already handled above)
+    (function initChartTimeFormat(){
+      const saved = localStorage.getItem(TIMEFMT_KEY);
+      if (saved === "12" || saved === "24") chartTimeFormat.value = saved;
+    })();
 
     // --------------------------
     // Auth state handler

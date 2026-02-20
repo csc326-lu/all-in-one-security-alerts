@@ -171,8 +171,6 @@
 
     /* =========================================================
        ✅ Sticky Account box (desktop only)
-       - Sticks under the sticky header
-       - Scrolls internally if it gets taller than the viewport
        ========================================================= */
     @media (min-width: 1040px){
       #accountCol{
@@ -236,15 +234,9 @@
     /* =========================================================
        Clickable alerts
        ========================================================= */
-    .alertClickable{
-      cursor: pointer;
-    }
-    .alertClickable:hover{
-      filter: brightness(0.99);
-    }
-    body.dark .alertClickable:hover{
-      filter: brightness(1.05);
-    }
+    .alertClickable{ cursor: pointer; }
+    .alertClickable:hover{ filter: brightness(0.99); }
+    body.dark .alertClickable:hover{ filter: brightness(1.05); }
 
     /* =========================================================
        Chart panel
@@ -269,13 +261,20 @@
       flex-wrap:wrap;
       margin-top:10px;
     }
+
+    /* ✅ Tooltip must not be clipped: container overflow visible; canvas is clipped by inner wrapper */
     .chartCanvasWrap{
-      position: relative; /* ✅ for tooltip positioning */
+      position: relative;
       border: 1px solid var(--border);
       border-radius: 12px;
-      overflow: hidden;
       background: var(--bg);
       padding: 8px;
+      overflow: visible;          /* ✅ allow tooltip to extend past edges */
+      z-index: 0;
+    }
+    .canvasClip{
+      border-radius: 10px;
+      overflow: hidden;          /* ✅ keep canvas drawing clipped nicely */
     }
     canvas{
       width: 100%;
@@ -294,42 +293,37 @@
       color:var(--muted);
     }
 
-    /* ✅ hover tooltip */
+    /* ✅ hover tooltip (2 lines, no indent, foreground) */
     .chartTooltip{
       position:absolute;
       display:none;
-      z-index: 10;
+      z-index: 9999;             /* ✅ foreground */
       pointer-events:none;
-      transform: translate(-50%, -115%);
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 8px 10px;
       box-shadow: 0 10px 25px rgba(0,0,0,0.12);
-      max-width: 260px;
-      line-height: 1.25;
+      line-height: 1.2;
+      white-space: nowrap;       /* ✅ keep each line from wrapping/indenting */
     }
-    .chartTooltip .row{
-      display:flex;
-      gap:8px;
-      align-items:flex-start;
+    .chartTooltip .ttLine1,
+    .chartTooltip .ttLine2{
+      margin: 0;                 /* ✅ no indent */
+      padding: 0;                /* ✅ no indent */
+      text-indent: 0;            /* ✅ no indent */
+      display:block;
     }
-    .chartTooltip .icon{
-      font-size: 16px;
-      line-height: 1;
-      margin-top: 1px;
-    }
-    .chartTooltip .title{
+    .chartTooltip .ttLine1{
       font-size: 12px;
       color: var(--text);
-      font-weight: 600;
-      margin: 0;
+      font-weight: 700;
     }
-    .chartTooltip .subtxt{
+    .chartTooltip .ttLine2{
       font-size: 12px;
       color: var(--muted);
-      margin: 2px 0 0;
-      word-break: break-word;
+      font-weight: 500;
+      margin-top: 2px;
     }
 
     /* =========================================================
@@ -362,14 +356,8 @@
       outline: 2px solid var(--pill-text);
       outline-offset: 1px;
     }
-    .deviceRow .selectBtn{
-      padding:8px 10px;
-      border-radius:10px;
-    }
-    .deviceRow .delBtn{
-      padding:8px 10px;
-      border-radius:10px;
-    }
+    .deviceRow .selectBtn{ padding:8px 10px; border-radius:10px; }
+    .deviceRow .delBtn{ padding:8px 10px; border-radius:10px; }
 
     /* =========================================================
        Dropdown panels (details/summary)
@@ -393,16 +381,9 @@
       font-weight: 600;
     }
     details.panel > summary::-webkit-details-marker{ display:none; }
-    details.panel > summary .chev{
-      color: var(--muted);
-      font-size: 12px;
-    }
-    details.panel[open] > summary .chev{
-      transform: rotate(180deg);
-    }
-    details.panel .panelBody{
-      padding: 0 12px 12px;
-    }
+    details.panel > summary .chev{ color: var(--muted); font-size: 12px; }
+    details.panel[open] > summary .chev{ transform: rotate(180deg); }
+    details.panel .panelBody{ padding: 0 12px 12px; }
 
     /* =========================================================
        User menu (header dropdown)
@@ -425,10 +406,7 @@
       gap: 6px;
       align-items: center;
     }
-    .pillBtn:disabled{
-      opacity: 0.65;
-      cursor: not-allowed;
-    }
+    .pillBtn:disabled{ opacity: 0.65; cursor: not-allowed; }
     .userMenu{
       position: absolute;
       right: 0;
@@ -442,16 +420,8 @@
       z-index: 20;
       display: none;
     }
-    .userMenu .smallMuted{
-      font-size: 12px;
-      color: var(--muted);
-      margin: 0 0 8px;
-    }
-    .userMenu .btncol{
-      display:flex;
-      flex-direction:column;
-      gap:8px;
-    }
+    .userMenu .smallMuted{ font-size: 12px; color: var(--muted); margin: 0 0 8px; }
+    .userMenu .btncol{ display:flex; flex-direction:column; gap:8px; }
 
     /* =========================================================
        Reauth modal (for delete account)
@@ -475,16 +445,9 @@
       padding: 14px;
       box-shadow: 0 16px 40px rgba(0,0,0,0.18);
     }
-    .modal h3{
-      margin: 0 0 6px;
-      font-size: 16px;
-    }
-    .modal p{
-      margin: 0 0 10px;
-    }
-    .modal .btnrow{
-      justify-content:flex-end;
-    }
+    .modal h3{ margin: 0 0 6px; font-size: 16px; }
+    .modal p{ margin: 0 0 10px; }
+    .modal .btnrow{ justify-content:flex-end; }
   </style>
 </head>
 
@@ -693,18 +656,15 @@
 
         <div class="divider"></div>
 
-        <div class="chartCanvasWrap">
-          <canvas id="chartCanvas" width="600" height="260"></canvas>
+        <div id="chartCanvasWrap" class="chartCanvasWrap">
+          <div class="canvasClip">
+            <canvas id="chartCanvas" width="600" height="260"></canvas>
+          </div>
 
-          <!-- ✅ hover tooltip -->
+          <!-- ✅ hover tooltip (2 lines, no indent) -->
           <div id="chartTooltip" class="chartTooltip" aria-hidden="true">
-            <div class="row">
-              <div class="icon">🕒</div>
-              <div>
-                <p id="chartTooltipTitle" class="title">—</p>
-                <p id="chartTooltipSub" class="subtxt">—</p>
-              </div>
-            </div>
+            <p id="chartTooltipLine1" class="ttLine1">—</p>
+            <p id="chartTooltipLine2" class="ttLine2">—</p>
           </div>
         </div>
 
@@ -843,6 +803,7 @@
     const chartRange = document.getElementById("chartRange");
     const chartBucket = document.getElementById("chartBucket");
     const chartCanvas = document.getElementById("chartCanvas");
+    const chartCanvasWrap = document.getElementById("chartCanvasWrap");
     const kpiCount = document.getElementById("kpiCount");
     const kpiFromTo = document.getElementById("kpiFromTo");
 
@@ -852,8 +813,8 @@
 
     // ✅ hover tooltip refs
     const chartTooltip = document.getElementById("chartTooltip");
-    const chartTooltipTitle = document.getElementById("chartTooltipTitle");
-    const chartTooltipSub = document.getElementById("chartTooltipSub");
+    const chartTooltipLine1 = document.getElementById("chartTooltipLine1");
+    const chartTooltipLine2 = document.getElementById("chartTooltipLine2");
 
     // keep last loaded alerts so we can re-render filtered view without refetching
     let lastLoaded = { deviceId: "", items: [] };
@@ -1179,16 +1140,48 @@
       chartTooltip.setAttribute("aria-hidden", "true");
     }
 
-    function showChartTooltip(pt){
-      const label = pt?.label || "Event point";
-      const when = formatRangeDateTime(pt.t);
-      chartTooltipTitle.textContent = `${label} • ${pt.yVal} event${pt.yVal === 1 ? "" : "s"}`;
-      chartTooltipSub.textContent = `${when}`;
+    function clamp(n, min, max){
+      return Math.max(min, Math.min(max, n));
+    }
 
-      chartTooltip.style.left = `${pt.x}px`;
-      chartTooltip.style.top = `${pt.y}px`;
+    function showChartTooltip(pt){
+      const label = pt?.label || "Sensor";
+      const when = formatRangeDateTime(pt.t);
+
+      // ✅ exactly two lines, no indents
+      chartTooltipLine1.textContent = `${label} • Event ${pt.yVal}`;
+      chartTooltipLine2.textContent = `${when}`;
+
+      // show to measure
       chartTooltip.style.display = "block";
       chartTooltip.setAttribute("aria-hidden", "false");
+      chartTooltip.style.left = "0px";
+      chartTooltip.style.top = "0px";
+
+      const wrapRect = chartCanvasWrap.getBoundingClientRect();
+      const canvasRect = chartCanvas.getBoundingClientRect();
+
+      // convert canvas-local coords -> wrap-local coords
+      const baseX = (canvasRect.left - wrapRect.left) + pt.x;
+      const baseY = (canvasRect.top - wrapRect.top) + pt.y;
+
+      const ttW = chartTooltip.offsetWidth || 200;
+      const ttH = chartTooltip.offsetHeight || 48;
+
+      const margin = 8;
+
+      // Prefer above the point, flip below if not enough room
+      let left = baseX - (ttW / 2);
+      let top  = baseY - ttH - 10;
+
+      if (top < margin) top = baseY + 10;
+
+      // clamp inside wrap bounds so it doesn't get cut off at edges
+      left = clamp(left, margin, wrapRect.width - margin - ttW);
+      top  = clamp(top, margin, wrapRect.height - margin - ttH);
+
+      chartTooltip.style.left = `${left}px`;
+      chartTooltip.style.top  = `${top}px`;
     }
 
     function drawLineChart(buckets, type, klass){
@@ -1287,7 +1280,7 @@
       hideChartTooltip();
     }
 
-    // ✅ hover behavior: show icon tooltip w/ specific date+time when hovering points
+    // ✅ hover behavior: show tooltip without clipping + clamp near edges
     function setupChartHover(){
       const hitRadius = 10; // px
       const hitRadius2 = hitRadius * hitRadius;
@@ -1694,8 +1687,6 @@
       const user = auth.currentUser;
       if (!user) return;
 
-      // Step 1: delete DB user node (paired devices list), THEN delete auth user.
-      // If auth deletion fails with requires-recent-login, we will reauth and retry.
       setAuthMsg("Deleting account…", "muted");
 
       // Remove per-user data (does not touch alerts/{deviceId})
@@ -1720,7 +1711,6 @@
       } catch (e){
         console.error(e);
 
-        // ✅ If Firebase requires recent login, prompt for password and reauth, then retry.
         if (e?.code === "auth/requires-recent-login"){
           const email = user.email;
           if (!email){
@@ -1761,11 +1751,7 @@
         reauthMsg.textContent = "Re-authenticated. Deleting…";
         reauthMsg.className = "small muted";
 
-        // Now retry (DB node may already be deleted; that's fine)
-        try {
-          await remove(ref(db, `users/${user.uid}`));
-        } catch (_) {}
-
+        try { await remove(ref(db, `users/${user.uid}`)); } catch (_) {}
         await deleteUser(user);
 
         closeReauthModal();
@@ -1855,8 +1841,6 @@
       localStorage.setItem(THEME_KEY, mode);
 
       if (currentChart) drawChartFromState();
-
-      // header height can change slightly with fonts/colors; recompute sticky offset
       updateStickyTop();
     }
 
@@ -1882,8 +1866,6 @@
     onAuthStateChanged(auth, async (user) => {
       closeUserMenu();
       closeReauthModal();
-
-      // header contents can change with user label; recompute sticky offset
       updateStickyTop();
 
       if (!user){
@@ -1892,7 +1874,6 @@
         userMenuBtn.disabled = true;
 
         showAuthView("login");
-
         deviceListEl.innerHTML = "";
 
         applySensorFilter(null);

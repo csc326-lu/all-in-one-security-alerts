@@ -94,6 +94,9 @@
       font-size: 12px;
       border: 1px solid var(--border);
       white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
     }
 
     main { padding: 12px 12px 24px; max-width: 1200px; margin: 0 auto; }
@@ -147,6 +150,17 @@
       outline: none;
     }
     label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 6px; }
+
+    /* ✅ Inline select for header pill (auto refresh) */
+    .inlineSelect{
+      width: auto;
+      padding: 4px 10px;
+      font-size: 12px;
+      border-radius: 999px;
+      background: var(--pill-bg);
+      color: var(--pill-text);
+      border: 1px solid var(--border);
+    }
 
     .error { color: var(--error); }
     .ok { color: var(--ok); }
@@ -456,7 +470,21 @@
     <h1>Security Alerts</h1>
     <div class="sub">
       <div id="status" class="pill muted">Loading…</div>
-      <div class="pill">Auto refresh: <span id="intervalLabel">2</span>s</div>
+
+      <!-- ✅ Auto refresh interval picker -->
+      <div class="pill" title="Change how often alerts auto-refresh">
+        <span>Auto refresh:</span>
+        <select id="refreshInterval" class="inlineSelect" aria-label="Auto refresh interval">
+          <option value="0">Off</option>
+          <option value="2" selected>2s</option>
+          <option value="5">5s</option>
+          <option value="10">10s</option>
+          <option value="15">15s</option>
+          <option value="30">30s</option>
+          <option value="60">60s</option>
+          <option value="120">2m</option>
+        </select>
+      </div>
 
       <!-- User button + dropdown menu -->
       <div class="userMenuWrap" id="userMenuWrap">
@@ -740,6 +768,10 @@
     let REFRESH_SECONDS = 2;
     const MAX_ITEMS = 50;
 
+    // ✅ Auto-refresh settings (persisted)
+    const AUTOREFRESH_KEY = "alertsAutoRefreshSeconds";
+    const ALLOWED_REFRESH = [0, 2, 5, 10, 15, 30, 60, 120];
+
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getDatabase(app);
@@ -747,7 +779,9 @@
     const statusEl = document.getElementById("status");
     const listEl = document.getElementById("list");
     const emptyEl = document.getElementById("empty");
-    const intervalLabelEl = document.getElementById("intervalLabel");
+
+    // ✅ Auto refresh select (header)
+    const refreshIntervalEl = document.getElementById("refreshInterval");
 
     // ✅ Measure header height and set --stickyTop so the Account box sticks *below* it.
     const headerEl = document.getElementById("topHeader");
@@ -829,8 +863,6 @@
 
     // ✅ chart hover hit points
     let chartHitPoints = []; // [{x,y,t,yVal, label}]
-
-    intervalLabelEl.textContent = REFRESH_SECONDS;
 
     function setStatus(text, kind) {
       statusEl.textContent = text;
@@ -1604,6 +1636,57 @@
     }
 
     // --------------------------
+    // ✅ Auto refresh timer (restartable when interval changes)
+    // --------------------------
+    let autoRefreshTimer = null;
+
+    function stopAutoRefresh(){
+      if (autoRefreshTimer){
+        clearInterval(autoRefreshTimer);
+        autoRefreshTimer = null;
+      }
+    }
+
+    function startAutoRefresh(){
+      stopAutoRefresh();
+      if (!REFRESH_SECONDS || REFRESH_SECONDS <= 0) return;
+
+      autoRefreshTimer = setInterval(() => {
+        if (auth.currentUser && currentDeviceId) loadAlertsForSelectedDevice();
+      }, REFRESH_SECONDS * 1000);
+    }
+
+    function initAutoRefresh(){
+      const saved = Number(localStorage.getItem(AUTOREFRESH_KEY));
+      if (ALLOWED_REFRESH.includes(saved)) {
+        REFRESH_SECONDS = saved;
+      }
+
+      // Ensure select reflects actual REFRESH_SECONDS
+      refreshIntervalEl.value = String(REFRESH_SECONDS);
+
+      startAutoRefresh();
+    }
+
+    refreshIntervalEl.onchange = async () => {
+      const next = Number(refreshIntervalEl.value);
+      if (!ALLOWED_REFRESH.includes(next)) return;
+
+      REFRESH_SECONDS = next;
+      localStorage.setItem(AUTOREFRESH_KEY, String(next));
+
+      startAutoRefresh();
+
+      // Optional: refresh immediately when changing interval (if logged in + device selected)
+      if (auth.currentUser && currentDeviceId) {
+        await loadAlertsForSelectedDevice();
+      }
+    };
+
+    // Start auto refresh with saved/default value
+    initAutoRefresh();
+
+    // --------------------------
     // Auth actions (Login / Signup)
     // --------------------------
     document.getElementById("goSignupBtn").onclick = () => {
@@ -1882,6 +1965,9 @@
 
         currentDeviceId = "";
 
+        // ✅ stop auto refresh when logged out (saves battery)
+        stopAutoRefresh();
+
         setStatus("Please log in", "warn");
         setAuthMsg("Log in to view alerts.", "muted");
         renderItems("none", []);
@@ -1910,13 +1996,11 @@
         setStatus("No device selected", "warn");
       }
 
+      // ✅ ensure auto refresh is running (if interval isn't Off)
+      startAutoRefresh();
+
       updateStickyTop();
     });
-
-    // Auto refresh (only when a device is selected + logged in)
-    setInterval(() => {
-      if (auth.currentUser && currentDeviceId) loadAlertsForSelectedDevice();
-    }, REFRESH_SECONDS * 1000);
   </script>
 </body>
 </html>

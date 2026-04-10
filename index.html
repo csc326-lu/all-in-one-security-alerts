@@ -32,6 +32,7 @@
       --alert-temperature: #ea580c;/* orange */
       --alert-water: #0284c7;      /* cyan/blue */
       --alert-gas: #dc2626;        /* red */
+      --alert-intrusion: #eab308;  /* yellow */
 
       /* JS will set this so the Account box sticks below the header */
       --stickyTop: 92px;
@@ -59,6 +60,7 @@
       --alert-temperature: #fb923c;
       --alert-water: #38bdf8;
       --alert-gas: #f87171;
+      --alert-intrusion: #facc15;
     }
 
     body {
@@ -151,7 +153,6 @@
     }
     label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 6px; }
 
-    /* ✅ Inline select for header pill (auto refresh) */
     .inlineSelect{
       width: auto;
       padding: 4px 10px;
@@ -183,9 +184,6 @@
       text-decoration: underline;
     }
 
-    /* =========================================================
-       ✅ Sticky Account box (desktop only)
-       ========================================================= */
     @media (min-width: 1040px){
       #accountCol{
         position: sticky;
@@ -197,9 +195,6 @@
       }
     }
 
-    /* =========================================================
-       Distinct alert styling
-       ========================================================= */
     .alertCard{
       position: relative;
       border-left: 6px solid var(--border);
@@ -226,7 +221,6 @@
     }
     .alertBadge .emoji{ font-size: 14px; line-height: 1; }
 
-    /* Type-specific: border + subtle tint */
     .alert--info{ border-left-color: var(--alert-info); background: linear-gradient(90deg, rgba(37,99,235,0.08), rgba(0,0,0,0) 45%); }
     body.dark .alert--info{ background: linear-gradient(90deg, rgba(96,165,250,0.10), rgba(0,0,0,0) 45%); }
 
@@ -245,16 +239,13 @@
     .alert--gas{ border-left-color: var(--alert-gas); background: linear-gradient(90deg, rgba(220,38,38,0.10), rgba(0,0,0,0) 45%); }
     body.dark .alert--gas{ background: linear-gradient(90deg, rgba(248,113,113,0.10), rgba(0,0,0,0) 45%); }
 
-    /* =========================================================
-       Clickable alerts
-       ========================================================= */
+    .alert--intrusion{ border-left-color: var(--alert-intrusion); background: linear-gradient(90deg, rgba(234,179,8,0.16), rgba(0,0,0,0) 45%); }
+    body.dark .alert--intrusion{ background: linear-gradient(90deg, rgba(250,204,21,0.16), rgba(0,0,0,0) 45%); }
+
     .alertClickable{ cursor: pointer; }
     .alertClickable:hover{ filter: brightness(0.99); }
     body.dark .alertClickable:hover{ filter: brightness(1.05); }
 
-    /* =========================================================
-       Chart panel
-       ========================================================= */
     #chartCol { display:none; }
     @media (min-width: 1040px){
       #chartCol { display:block; }
@@ -276,19 +267,18 @@
       margin-top:10px;
     }
 
-    /* ✅ Tooltip must not be clipped: container overflow visible; canvas is clipped by inner wrapper */
     .chartCanvasWrap{
       position: relative;
       border: 1px solid var(--border);
       border-radius: 12px;
       background: var(--bg);
       padding: 8px;
-      overflow: visible;          /* ✅ allow tooltip to extend past edges */
+      overflow: visible;
       z-index: 0;
     }
     .canvasClip{
       border-radius: 10px;
-      overflow: hidden;          /* ✅ keep canvas drawing clipped nicely */
+      overflow: hidden;
     }
     canvas{
       width: 100%;
@@ -296,7 +286,6 @@
       display:block;
     }
 
-    /* ✅ keep Range always below Events */
     .kpiRow{
       display:flex;
       flex-direction:column;
@@ -307,11 +296,10 @@
       color:var(--muted);
     }
 
-    /* ✅ hover tooltip (2 lines, no indent, foreground) */
     .chartTooltip{
       position:absolute;
       display:none;
-      z-index: 9999;             /* ✅ foreground */
+      z-index: 9999;
       pointer-events:none;
       background: var(--surface);
       border: 1px solid var(--border);
@@ -319,13 +307,13 @@
       padding: 8px 10px;
       box-shadow: 0 10px 25px rgba(0,0,0,0.12);
       line-height: 1.2;
-      white-space: nowrap;       /* ✅ keep each line from wrapping/indenting */
+      white-space: nowrap;
     }
     .chartTooltip .ttLine1,
     .chartTooltip .ttLine2{
-      margin: 0;                 /* ✅ no indent */
-      padding: 0;                /* ✅ no indent */
-      text-indent: 0;            /* ✅ no indent */
+      margin: 0;
+      padding: 0;
+      text-indent: 0;
       display:block;
     }
     .chartTooltip .ttLine1{
@@ -340,7 +328,6 @@
       margin-top: 2px;
     }
 
-    /* ✅ Legend for multi-series charts */
     .legend{
       display:flex;
       flex-wrap:wrap;
@@ -365,9 +352,6 @@
       flex: 0 0 auto;
     }
 
-    /* =========================================================
-       Manage devices list
-       ========================================================= */
     .deviceList{
       display:flex;
       flex-direction:column;
@@ -398,9 +382,6 @@
     .deviceRow .selectBtn{ padding:8px 10px; border-radius:10px; }
     .deviceRow .delBtn{ padding:8px 10px; border-radius:10px; }
 
-    /* =========================================================
-       Dropdown panels (details/summary)
-       ========================================================= */
     details.panel{
       border: 1px solid var(--border);
       border-radius: 12px;
@@ -424,9 +405,6 @@
     details.panel[open] > summary .chev{ transform: rotate(180deg); }
     details.panel .panelBody{ padding: 0 12px 12px; }
 
-    /* =========================================================
-       User menu (header dropdown)
-       ========================================================= */
     .userMenuWrap{
       position: relative;
       display: inline-flex;
@@ -462,9 +440,6 @@
     .userMenu .smallMuted{ font-size: 12px; color: var(--muted); margin: 0 0 8px; }
     .userMenu .btncol{ display:flex; flex-direction:column; gap:8px; }
 
-    /* =========================================================
-       Reauth modal (for delete account)
-       ========================================================= */
     .modalOverlay{
       position: fixed;
       inset: 0;
@@ -496,12 +471,11 @@
     <div class="sub">
       <div id="status" class="pill muted">Loading…</div>
 
-      <!-- ✅ Auto refresh interval picker -->
       <div class="pill" title="Change how often alerts auto-refresh">
         <span>Auto refresh:</span>
         <select id="refreshInterval" class="inlineSelect" aria-label="Auto refresh interval">
           <option value="0">Off</option>
-          <option value="1" selected>1s</option>
+          <option value="1">1s</option>
           <option value="2" selected>2s</option>
           <option value="5">5s</option>
           <option value="10">10s</option>
@@ -511,7 +485,6 @@
         </select>
       </div>
 
-      <!-- User button + dropdown menu -->
       <div class="userMenuWrap" id="userMenuWrap">
         <button id="userMenuBtn" class="pillBtn" type="button" disabled aria-expanded="false">
           <span>User:</span>
@@ -536,20 +509,17 @@
 
     <div class="btnrow">
       <button id="refreshBtn">Refresh now</button>
-      <button id="allChartBtn" class="primary" title="Show all alert types (gas, water, temperature, vibration, etc.) on one graph" disabled>All alerts chart</button>
+      <button id="allChartBtn" class="primary" title="Show all alert types (gas, water, temperature, vibration, intrusion, etc.) on one graph" disabled>All alerts chart</button>
       <button id="clearLocalBtn" title="Hides alerts locally (does not delete Firebase)">Clear on screen</button>
       <button id="themeBtn" title="Toggle night mode">Night mode: Off</button>
-      <!-- logout button moved into user menu -->
     </div>
   </header>
 
   <main>
     <div class="grid">
-      <!-- LEFT: Auth + Pairing -->
       <div id="accountCol" class="card">
         <h3 style="margin:0 0 8px;">Account</h3>
 
-        <!-- LOGIN VIEW -->
         <div id="loginView">
           <label>Email</label>
           <input id="loginEmail" type="email" placeholder="name@example.com" autocomplete="email"/>
@@ -575,7 +545,6 @@
           </p>
         </div>
 
-        <!-- SIGNUP VIEW -->
         <div id="signupView" style="display:none;">
           <p class="small muted" style="margin:0 0 8px;">
             Create a new account for the alerts dashboard.
@@ -600,10 +569,7 @@
           </p>
         </div>
 
-        <!-- PAIRED / LOGGED-IN PANEL -->
         <div id="pairPanel" style="display:none;">
-
-          <!-- Pair a device (dropdown) -->
           <details id="pairDetails" class="panel" open>
             <summary>
               <span>Pair a device</span>
@@ -630,7 +596,6 @@
             </div>
           </details>
 
-          <!-- Manage paired devices (dropdown) -->
           <details id="manageDetails" class="panel" open>
             <summary>
               <span>Manage paired devices</span>
@@ -654,7 +619,6 @@
         <p id="authMsg" class="small muted" style="margin:0;"></p>
       </div>
 
-      <!-- MIDDLE: Alerts -->
       <div>
         <div id="filterBar" class="card" style="display:none; margin-bottom:12px;">
           <div class="alertTop" style="margin-bottom:0;">
@@ -670,7 +634,6 @@
         </div>
       </div>
 
-      <!-- RIGHT: Chart (third column) -->
       <div id="chartCol" class="card hiddenWide">
         <div class="chartHeader">
           <span id="chartTitle" class="alertBadge"><span class="emoji">📈</span> Sensor chart</span>
@@ -680,7 +643,6 @@
           This graph shows alert <span class="mono">event counts</span> over time for the selected sensor — or you can use <span class="mono">All alerts chart</span> to view all types on one graph.
         </p>
 
-        <!-- ✅ legend (used for All alerts chart too) -->
         <div id="chartLegend" class="legend" aria-label="Chart legend"></div>
 
         <div class="chartControls">
@@ -703,7 +665,6 @@
               <option value="7d">1 week</option>
             </select>
 
-            <!-- ✅ time format toggle below Buckets -->
             <label style="margin:10px 0 6px;">Time format</label>
             <select id="chartTimeFormat">
               <option value="24" selected>Military (24-hour)</option>
@@ -719,7 +680,6 @@
             <canvas id="chartCanvas" width="600" height="260"></canvas>
           </div>
 
-          <!-- ✅ hover tooltip (2 lines, no indent) -->
           <div id="chartTooltip" class="chartTooltip" aria-hidden="true">
             <p id="chartTooltipLine1" class="ttLine1">—</p>
             <p id="chartTooltipLine2" class="ttLine2">—</p>
@@ -734,7 +694,6 @@
     </div>
   </main>
 
-  <!-- Re-auth modal -->
   <div id="reauthOverlay" class="modalOverlay" role="dialog" aria-modal="true" aria-label="Re-authenticate">
     <div class="modal">
       <h3>Confirm your password</h3>
@@ -758,7 +717,6 @@
   </div>
 
   <script type="module">
-    // Firebase SDK (v10 modular) via CDN modules
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import {
       getAuth,
@@ -783,7 +741,6 @@
       limitToLast
     } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-    // ========= YOUR FIREBASE WEB CONFIG =========
     const firebaseConfig = {
       apiKey: "AIzaSyCeF4SVT2M6gcIkfaqo54TvTeJqRmA5Qo4",
       authDomain: "all-in-one-security-system.firebaseapp.com",
@@ -794,13 +751,11 @@
       appId: "1:503460021077:web:ffbaa186aeb34a749ce5dc"
     };
 
-    // ========= UI CONFIG =========
     let REFRESH_SECONDS = 2;
     const MAX_ITEMS = 50;
 
-    // ✅ Auto-refresh settings (persisted)
     const AUTOREFRESH_KEY = "alertsAutoRefreshSeconds";
-    const ALLOWED_REFRESH = [0, 2, 5, 10, 30, 60, 300];
+    const ALLOWED_REFRESH = [0, 1, 2, 5, 10, 30, 60, 300];
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
@@ -809,24 +764,18 @@
     const statusEl = document.getElementById("status");
     const listEl = document.getElementById("list");
     const emptyEl = document.getElementById("empty");
-
-    // ✅ Auto refresh select (header)
     const refreshIntervalEl = document.getElementById("refreshInterval");
-
-    // ✅ All alerts chart button
     const allChartBtn = document.getElementById("allChartBtn");
 
-    // ✅ Measure header height and set --stickyTop so the Account box sticks *below* it.
     const headerEl = document.getElementById("topHeader");
     function updateStickyTop(){
-      const gap = 12; // matches grid gap / main padding spacing
+      const gap = 12;
       const h = headerEl ? headerEl.offsetHeight : 80;
       document.documentElement.style.setProperty("--stickyTop", `${h + gap}px`);
     }
     updateStickyTop();
     window.addEventListener("resize", updateStickyTop);
 
-    // User menu refs
     const userMenuBtn = document.getElementById("userMenuBtn");
     const userLabelEl = document.getElementById("userLabel");
     const userMenu = document.getElementById("userMenu");
@@ -835,7 +784,6 @@
     const logoutBtn = document.getElementById("logoutBtn");
     const deleteAccountBtn = document.getElementById("deleteAccountBtn");
 
-    // Reauth modal refs
     const reauthOverlay = document.getElementById("reauthOverlay");
     const reauthEmail = document.getElementById("reauthEmail");
     const reauthPass = document.getElementById("reauthPass");
@@ -851,7 +799,6 @@
 
     const reloadDevicesBtn = document.getElementById("reloadDevicesBtn");
 
-    // NOTE: keep a hidden select for compatibility (no longer shown in UI)
     const deviceSelect = document.createElement("select");
     deviceSelect.style.display = "none";
     deviceSelect.id = "deviceSelectHidden";
@@ -859,12 +806,10 @@
 
     const deviceListEl = document.getElementById("deviceList");
 
-    // filter UI refs
     const filterBar = document.getElementById("filterBar");
     const filterBadge = document.getElementById("filterBadge");
     const clearFilterBtn = document.getElementById("clearFilterBtn");
 
-    // chart UI refs
     const chartCol = document.getElementById("chartCol");
     const chartTitle = document.getElementById("chartTitle");
     const chartLegend = document.getElementById("chartLegend");
@@ -875,42 +820,30 @@
     const kpiCount = document.getElementById("kpiCount");
     const kpiFromTo = document.getElementById("kpiFromTo");
 
-    // ✅ time format select + persistence
     const chartTimeFormat = document.getElementById("chartTimeFormat");
-    const TIMEFMT_KEY = "alertsChartTimeFormat"; // "24" | "12"
+    const TIMEFMT_KEY = "alertsChartTimeFormat";
 
-    // ✅ hover tooltip refs
     const chartTooltip = document.getElementById("chartTooltip");
     const chartTooltipLine1 = document.getElementById("chartTooltipLine1");
     const chartTooltipLine2 = document.getElementById("chartTooltipLine2");
 
-    // keep last loaded alerts so we can re-render filtered view without refetching
     let lastLoaded = { deviceId: "", items: [] };
-    // current sensor filter (klass.type) or null for all
     let currentSensorFilter = null;
-
-    // current chart selection:
-    // - sensor mode: {mode:"sensor", type, label, emoji}
-    // - all mode:    {mode:"all", type:"all", label:"All alerts", emoji:"📊"}
     let currentChart = null;
-
-    // current device selection
     let currentDeviceId = "";
+    let chartHitPoints = [];
 
-    // ✅ chart hover hit points
-    let chartHitPoints = []; // [{x,y,t,yVal,label}]
-
-    // Chart series meta (for All Alerts chart)
     const ALERT_META = {
       gas:         { label: "Gas/Smoke",   emoji: "🛑" },
       water:       { label: "Water",       emoji: "💧" },
       temperature: { label: "Temperature", emoji: "🌡️" },
       vibration:   { label: "Vibration",   emoji: "📳" },
+      intrusion:   { label: "Intrusion",   emoji: "🟡" },
       online:      { label: "System",      emoji: "✅" },
       info:        { label: "Alert",       emoji: "🔔" }
     };
 
-    const ALL_TYPES = ["gas","water","temperature","vibration","online","info"];
+    const ALL_TYPES = ["gas","water","temperature","vibration","intrusion","online","info"];
 
     function setStatus(text, kind) {
       statusEl.textContent = text;
@@ -925,7 +858,6 @@
     }
 
     function showAuthView(which){
-      // which = "login" | "signup"
       if (which === "signup"){
         loginView.style.display = "none";
         signupView.style.display = "block";
@@ -940,9 +872,6 @@
       allChartBtn.disabled = !(auth.currentUser && currentDeviceId);
     }
 
-    // --------------------------
-    // User menu behavior
-    // --------------------------
     function closeUserMenu(){
       userMenu.style.display = "none";
       userMenuBtn.setAttribute("aria-expanded", "false");
@@ -967,9 +896,6 @@
     document.addEventListener("click", () => closeUserMenu());
     userMenu.addEventListener("click", (ev) => ev.stopPropagation());
 
-    // --------------------------
-    // Reauth modal helpers
-    // --------------------------
     function openReauthModal(email){
       reauthMsg.textContent = "";
       reauthPass.value = "";
@@ -990,7 +916,7 @@
     function formatTs(ts) {
       const n = Number(ts);
       if (!isFinite(n) || n <= 0) return "time unknown";
-      const ms = (n > 1577836800) ? (n * 1000) : n; // epoch seconds -> ms
+      const ms = (n > 1577836800) ? (n * 1000) : n;
       const d = new Date(ms);
       if (isNaN(d.getTime())) return String(ts);
       return d.toLocaleString();
@@ -1002,7 +928,6 @@
       return (n > 1577836800) ? (n * 1000) : n;
     }
 
-    // ---------- Local hide (per device) ----------
     function hiddenKeyForDevice(deviceId){ return `hiddenAlertKeys:${deviceId}`; }
     function loadHiddenSet(deviceId){
       return new Set(JSON.parse(localStorage.getItem(hiddenKeyForDevice(deviceId)) || "[]"));
@@ -1011,42 +936,79 @@
       localStorage.setItem(hiddenKeyForDevice(deviceId), JSON.stringify(Array.from(setObj)));
     }
 
-    /* =========================================================
-       alert classification (message -> type + label + emoji)
-       ========================================================= */
+    function hasWord(msg, word){
+      return new RegExp(`\\b${word}\\b`, "i").test(msg);
+    }
+
     function classifyAlert(msgRaw){
       const msg = String(msgRaw || "").toLowerCase();
 
-      // online/system heartbeat
-      if (msg.includes("online") || msg.includes("connected") || msg.includes("system: online") || msg.includes("tiva alert system")){
+      if (
+        msg.includes("online") ||
+        msg.includes("connected") ||
+        msg.includes("system: online") ||
+        msg.includes("tiva alert system")
+      ){
         return { type: "online", label: "System", emoji: "✅" };
       }
 
-      // gas/smoke
-      if (msg.includes("gas") || msg.includes("smoke") || msg.includes("co") || msg.includes("carbon")){
+      if (
+        hasWord(msg, "gas") ||
+        hasWord(msg, "smoke") ||
+        hasWord(msg, "carbon") ||
+        msg.includes("carbon monoxide") ||
+        hasWord(msg, "co2") ||
+        hasWord(msg, "methane") ||
+        hasWord(msg, "propane")
+      ){
         return { type: "gas", label: "Gas/Smoke", emoji: "🛑" };
       }
 
-      // water/flood/leak
-      if (msg.includes("water") || msg.includes("flood") || msg.includes("leak")){
+      if (
+        msg.includes("water") ||
+        msg.includes("flood") ||
+        msg.includes("leak")
+      ){
         return { type: "water", label: "Water", emoji: "💧" };
       }
 
-      // temperature/heat
-      if (msg.includes("temp") || msg.includes("temperature") || msg.includes("heat")){
+      if (
+        msg.includes("temp") ||
+        msg.includes("temperature") ||
+        msg.includes("heat")
+      ){
         return { type: "temperature", label: "Temperature", emoji: "🌡️" };
       }
 
-      // vibration/motion/shock
-      if (msg.includes("vibration") || msg.includes("vibrate") || msg.includes("motion") || msg.includes("shake") || msg.includes("impact")){
+      if (
+        msg.includes("pir") ||
+        msg.includes("intrusion") ||
+        msg.includes("intruder") ||
+        msg.includes("alarm triggered") ||
+        msg.includes("motion detected") ||
+        msg.includes("system armed") ||
+        msg.includes("system disarmed") ||
+        msg.includes("passcode") ||
+        msg.includes("keypad") ||
+        msg.includes("armed by") ||
+        msg.includes("disarmed by")
+      ){
+        return { type: "intrusion", label: "Intrusion", emoji: "🟡" };
+      }
+
+      if (
+        msg.includes("vibration") ||
+        msg.includes("vibrate") ||
+        msg.includes("shake") ||
+        msg.includes("impact") ||
+        msg.includes("shock")
+      ){
         return { type: "vibration", label: "Vibration", emoji: "📳" };
       }
 
-      // default
       return { type: "info", label: "Alert", emoji: "🔔" };
     }
 
-    // filter bar helpers
     function applySensorFilter(type, label, emoji){
       currentSensorFilter = type || null;
 
@@ -1066,9 +1028,6 @@
       closeChart();
     };
 
-    /* =========================================================
-       Chart helpers
-       ========================================================= */
     function setChartLegend(types){
       chartLegend.innerHTML = "";
       if (!types || !types.length) return;
@@ -1167,12 +1126,10 @@
       return allMsSortedAsc.length ? allMsSortedAsc[0] : now - 7 * 24 * 60 * 60 * 1000;
     }
 
-    // ✅ chart time formatting helpers
     function is24Hour(){
       return (chartTimeFormat?.value || "24") === "24";
     }
 
-    // For x-axis labels (compact)
     function niceTimeLabel(ms){
       const d = new Date(ms);
       const mo = d.getMonth() + 1;
@@ -1191,7 +1148,6 @@
       return `${mo}/${da} ${hh}:${mm} ${ampm}`;
     }
 
-    // For tooltips & Range line (respects the same 12/24 toggle)
     function formatRangeDateTime(ms){
       const d = new Date(ms);
       if (isNaN(d.getTime())) return String(ms);
@@ -1222,7 +1178,6 @@
         return;
       }
 
-      // sensor chart (single series)
       const deviceId = lastLoaded.deviceId || currentDeviceId || "";
       const hidden = loadHiddenSet(deviceId);
       const type = currentChart.type;
@@ -1267,7 +1222,6 @@
       const deviceId = lastLoaded.deviceId || currentDeviceId || "";
       const hidden = loadHiddenSet(deviceId);
 
-      // Collect timestamps per type
       const perType = {};
       for (const t of ALL_TYPES) perType[t] = [];
 
@@ -1291,7 +1245,6 @@
       const startMs = rangeStartMs(rangeVal, allMs);
       const endMs = Date.now();
 
-      // Filter in-range per type
       const inRangePerType = {};
       let total = 0;
 
@@ -1341,11 +1294,9 @@
       const label = pt?.label || "Sensor";
       const when = formatRangeDateTime(pt.t);
 
-      // ✅ exactly two lines, no indents
       chartTooltipLine1.textContent = `${label} • Event ${pt.yVal}`;
       chartTooltipLine2.textContent = `${when}`;
 
-      // show to measure
       chartTooltip.style.display = "block";
       chartTooltip.setAttribute("aria-hidden", "false");
       chartTooltip.style.left = "0px";
@@ -1354,7 +1305,6 @@
       const wrapRect = chartCanvasWrap.getBoundingClientRect();
       const canvasRect = chartCanvas.getBoundingClientRect();
 
-      // convert canvas-local coords -> wrap-local coords
       const baseX = (canvasRect.left - wrapRect.left) + pt.x;
       const baseY = (canvasRect.top - wrapRect.top) + pt.y;
 
@@ -1363,13 +1313,11 @@
 
       const margin = 8;
 
-      // Prefer above the point, flip below if not enough room
       let left = baseX - (ttW / 2);
       let top  = baseY - ttH - 10;
 
       if (top < margin) top = baseY + 10;
 
-      // clamp inside wrap bounds so it doesn't get cut off at edges
       left = clamp(left, margin, wrapRect.width - margin - ttW);
       top  = clamp(top, margin, wrapRect.height - margin - ttH);
 
@@ -1451,7 +1399,6 @@
       });
       ctx.stroke();
 
-      // draw points + build hit map for hover
       chartHitPoints = [];
       ctx.fillStyle = stroke;
       buckets.forEach((b, i) => {
@@ -1499,7 +1446,6 @@
 
       const yTicks = Math.max(1, Math.min(4, maxY));
 
-      // grid
       ctx.lineWidth = 1;
       ctx.strokeStyle = border;
 
@@ -1511,7 +1457,6 @@
         ctx.stroke();
       }
 
-      // y labels
       ctx.fillStyle = text;
       ctx.font = "12px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Arial, sans-serif";
       ctx.textAlign = "right";
@@ -1522,7 +1467,6 @@
         ctx.fillText(String(v), padL - 8, y);
       }
 
-      // x labels
       const t0 = buckets[0]?.t ?? Date.now();
       const tMid = buckets[Math.floor(buckets.length/2)]?.t ?? t0;
       const tEnd = buckets[buckets.length-1]?.t ?? t0;
@@ -1540,7 +1484,6 @@
       const xForI = (i) => padL + (w * (buckets.length === 1 ? 0 : i / (buckets.length - 1)));
       const yForVal = (val) => padT + (h * (1 - (val / maxY)));
 
-      // draw each series
       chartHitPoints = [];
 
       for (const t of types){
@@ -1558,7 +1501,6 @@
         });
         ctx.stroke();
 
-        // points + hover map
         ctx.fillStyle = stroke;
         const meta = ALERT_META[t] || { label: t, emoji: "🔔" };
         buckets.forEach((b, i) => {
@@ -1583,9 +1525,8 @@
       hideChartTooltip();
     }
 
-    // ✅ hover behavior: show tooltip without clipping + clamp near edges
     function setupChartHover(){
-      const hitRadius = 10; // px
+      const hitRadius = 10;
       const hitRadius2 = hitRadius * hitRadius;
 
       chartCanvas.addEventListener("mouseleave", () => hideChartTooltip());
@@ -1597,7 +1538,6 @@
         const mx = ev.clientX - rect.left;
         const my = ev.clientY - rect.top;
 
-        // Find nearest point within radius
         let best = null;
         let bestD2 = Infinity;
 
@@ -1623,7 +1563,6 @@
     chartRange.onchange = drawChartFromState;
     chartBucket.onchange = drawChartFromState;
 
-    // ✅ init time format + persist choice
     (function initChartTimeFormat(){
       const saved = localStorage.getItem(TIMEFMT_KEY);
       if (saved === "12" || saved === "24") chartTimeFormat.value = saved;
@@ -1639,11 +1578,9 @@
       updateStickyTop();
     });
 
-    // ✅ Open/close All Alerts chart
     allChartBtn.onclick = () => {
       if (!(auth.currentUser && currentDeviceId)) return;
 
-      // toggle
       if (currentChart && (currentChart.mode === "all" || currentChart.type === "all")){
         closeChart();
         return;
@@ -1924,9 +1861,6 @@
       }
     }
 
-    // --------------------------
-    // ✅ Auto refresh timer (restartable when interval changes)
-    // --------------------------
     let autoRefreshTimer = null;
 
     function stopAutoRefresh(){
@@ -1951,7 +1885,6 @@
         REFRESH_SECONDS = saved;
       }
 
-      // Ensure select reflects actual REFRESH_SECONDS
       refreshIntervalEl.value = String(REFRESH_SECONDS);
 
       startAutoRefresh();
@@ -1966,18 +1899,13 @@
 
       startAutoRefresh();
 
-      // Optional: refresh immediately when changing interval (if logged in + device selected)
       if (auth.currentUser && currentDeviceId) {
         await loadAlertsForSelectedDevice();
       }
     };
 
-    // Start auto refresh with saved/default value
     initAutoRefresh();
 
-    // --------------------------
-    // Auth actions (Login / Signup)
-    // --------------------------
     document.getElementById("goSignupBtn").onclick = () => {
       setAuthMsg("", "muted");
       showAuthView("signup");
@@ -2047,9 +1975,6 @@
       }
     };
 
-    // --------------------------
-    // User menu actions (Logout / Delete account)
-    // --------------------------
     logoutBtn.onclick = async () => {
       closeUserMenu();
       await signOut(auth);
@@ -2061,10 +1986,7 @@
 
       setAuthMsg("Deleting account…", "muted");
 
-      // Remove per-user data (does not touch alerts/{deviceId})
       await remove(ref(db, `users/${user.uid}`));
-
-      // Delete auth user
       await deleteUser(user);
     }
 
@@ -2097,7 +2019,6 @@
       }
     };
 
-    // Reauth confirm -> reauthenticate -> retry delete
     reauthConfirmBtn.onclick = async () => {
       const user = auth.currentUser;
       if (!user) { closeReauthModal(); return; }
@@ -2138,9 +2059,6 @@
       }
     };
 
-    // --------------------------
-    // Pair device
-    // --------------------------
     document.getElementById("pairBtn").onclick = async () => {
       const user = auth.currentUser;
       if (!user) return;
@@ -2184,9 +2102,6 @@
       await loadAlertsForSelectedDevice();
     };
 
-    // --------------------------
-    // Buttons for alerts UI
-    // --------------------------
     document.getElementById("refreshBtn").onclick = loadAlertsForSelectedDevice;
 
     document.getElementById("clearLocalBtn").onclick = () => {
@@ -2202,7 +2117,6 @@
       loadAlertsForSelectedDevice();
     };
 
-    // ---------- Theme (Night Mode) ----------
     const THEME_KEY = "alertsTheme";
     const themeBtn = document.getElementById("themeBtn");
 
@@ -2230,11 +2144,7 @@
       const currentlyDark = document.body.classList.contains("dark");
       applyTheme(currentlyDark ? "light" : "dark");
     };
-    // --------------------------------------
 
-    // --------------------------
-    // Auth state handler
-    // --------------------------
     onAuthStateChanged(auth, async (user) => {
       closeUserMenu();
       closeReauthModal();
@@ -2255,7 +2165,6 @@
         currentDeviceId = "";
         updateAllChartBtnState();
 
-        // ✅ stop auto refresh when logged out (saves battery)
         stopAutoRefresh();
 
         setStatus("Please log in", "warn");
@@ -2286,7 +2195,6 @@
         setStatus("No device selected", "warn");
       }
 
-      // ✅ ensure auto refresh is running (if interval isn't Off)
       startAutoRefresh();
       updateAllChartBtnState();
 
